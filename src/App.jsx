@@ -378,35 +378,35 @@ const MFAVerificationPanel = ({ onVerify, onCancel, onReset }) => {
     };
 
     return (
-        <GlassPanel className="w-full max-w-md p-8 mx-auto">
-            <div className="text-center mb-8">
-                <Icon name="shieldCheck" className="w-16 h-16 text-green-500 dark:text-green-400 mx-auto mb-4" />
-                <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 tracking-wider">Verify Identity</h1>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">Enter verification code from MFA application</p>
+        <GlassPanel className="w-full max-w-md p-4 sm:p-6 md:p-8 mx-auto">
+            <div className="text-center mb-6 sm:mb-8">
+                <Icon name="shieldCheck" className="w-12 sm:w-14 md:w-16 h-12 sm:h-14 md:h-16 text-green-500 dark:text-green-400 mx-auto mb-3 sm:mb-4" />
+                <h1 className="text-2xl sm:text-2xl md:text-3xl font-bold text-gray-800 dark:text-gray-100 tracking-wider">Verify Identity</h1>
+                <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm mt-2">Enter verification code from MFA application</p>
             </div>
             
             {!showReset ? (
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
                     <div>
-                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Authentication Code</label>
+                        <label className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Authentication Code</label>
                         <input 
                             type="text" 
                             inputMode="numeric"
                             value={code} 
                             onChange={handleCodeChange}
                             maxLength="6"
-                            className="w-full p-3 text-center text-2xl font-mono tracking-widest bg-gray-200/50 dark:bg-black/30 border border-cyan-500/20 dark:border-cyan-300/20 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:outline-none transition" 
+                            className="w-full p-2 sm:p-3 text-xl sm:text-2xl font-mono tracking-widest bg-gray-200/50 dark:bg-black/30 border border-cyan-500/20 dark:border-cyan-300/20 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:outline-none transition" 
                             placeholder="000000"
                             disabled={loading}
                         />
                     </div>
-                    {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                    <div className="flex gap-3">
+                    {error && <p className="text-red-500 text-xs sm:text-sm text-center">{error}</p>}
+                    <div className="flex gap-2 sm:gap-3">
                         <button 
                             type="button" 
                             onClick={onCancel}
                             disabled={loading}
-                            className="flex-1 p-3 bg-gray-500/20 hover:bg-gray-500/30 text-gray-700 dark:text-gray-300 font-bold rounded-lg transition-colors disabled:opacity-50"
+                            className="flex-1 p-2 sm:p-3 bg-gray-500/20 hover:bg-gray-500/30 text-gray-700 dark:text-gray-300 font-bold text-sm sm:text-base rounded-lg transition-colors disabled:opacity-50"
                         >
                             Cancel
                         </button>
@@ -573,7 +573,7 @@ const LoginPanel = ({ onLogin, isLocked, lockTimeRemaining, onToggleTheme, isDar
 const Sidebar = ({ navItems, activeView, setActiveView, isSidebarOpen, setIsSidebarOpen }) => {
     return (
         <>
-            <div className={`fixed top-0 left-0 h-full p-4 z-30 w-64 transform transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+            <div className={`fixed top-0 left-0 h-full p-2 sm:p-3 md:p-4 z-30 w-56 sm:w-60 md:w-64 transform transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
                 <GlassPanel className="h-full flex flex-col">
                     <div className="flex-shrink-0 flex items-center justify-between gap-3 mb-8 px-2 pt-4">
                         <div className="flex items-center gap-3">
@@ -607,53 +607,53 @@ const Sidebar = ({ navItems, activeView, setActiveView, isSidebarOpen, setIsSide
 };
 
 const WelcomeModal = ({ onClose }) => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" onClick={onClose}>
-        <div className="w-full max-w-2xl bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-3xl shadow-2xl border-2 border-cyan-500/30 overflow-hidden animate-[fadeIn_0.5s_ease-out]" onClick={(e) => e.stopPropagation()}>
-            <div className="p-8 text-center">
-                <div className="mb-6 flex justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md" onClick={onClose}>
+        <div className="w-full max-w-2xl bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-2xl sm:rounded-3xl shadow-2xl border-2 border-cyan-500/30 overflow-hidden animate-[fadeIn_0.5s_ease-out]" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 sm:p-6 md:p-8 text-center">
+                <div className="mb-4 sm:mb-6 flex justify-center">
                     <div className="relative">
                         <div className="absolute inset-0 bg-cyan-500 rounded-full blur-xl opacity-50 animate-pulse" />
-                        <Icon name="network" className="w-24 h-24 text-cyan-500 dark:text-cyan-400 relative" />
+                        <Icon name="network" className="w-16 sm:w-20 md:w-24 h-16 sm:h-20 md:h-24 text-cyan-500 dark:text-cyan-400 relative" />
                     </div>
                 </div>
-                <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-3 bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3 bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
                     Welcome to NMS Dashboard
                 </h2>
-                <p className="text-xl text-gray-700 dark:text-gray-300 mb-6 font-semibold">
+                <p className="text-base sm:text-lg md:text-xl text-gray-700 dark:text-gray-300 mb-4 sm:mb-6 font-semibold">
                     Network Management System - Firewall Simulation Web UI
                 </p>
-                <div className="bg-white/50 dark:bg-black/20 rounded-2xl p-6 mb-6 text-left space-y-4">
-                    <div className="flex items-start gap-3">
-                        <Icon name="shieldCheck" className="w-6 h-6 text-cyan-500 flex-shrink-0 mt-1" />
+                <div className="bg-white/50 dark:bg-black/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 text-left space-y-3 sm:space-y-4">
+                    <div className="flex items-start gap-2 sm:gap-3">
+                        <Icon name="shieldCheck" className="w-5 sm:w-6 h-5 sm:h-6 text-cyan-500 flex-shrink-0 mt-0.5 sm:mt-1" />
                         <div>
-                            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Advanced Security Features</h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Multi-factor authentication, role-based access control, and real-time threat monitoring</p>
+                            <h3 className="font-semibold text-gray-900 dark:text-white mb-0.5 sm:mb-1 text-sm sm:text-base">Advanced Security Features</h3>
+                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Multi-factor authentication, role-based access control, and real-time threat monitoring</p>
                         </div>
                     </div>
-                    <div className="flex items-start gap-3">
-                        <Icon name="activity" className="w-6 h-6 text-blue-500 flex-shrink-0 mt-1" />
+                    <div className="flex items-start gap-2 sm:gap-3">
+                        <Icon name="activity" className="w-5 sm:w-6 h-5 sm:h-6 text-blue-500 flex-shrink-0 mt-0.5 sm:mt-1" />
                         <div>
-                            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Real-Time Monitoring</h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Live device status, bandwidth tracking, and performance analytics dashboard</p>
+                            <h3 className="font-semibold text-gray-900 dark:text-white mb-0.5 sm:mb-1 text-sm sm:text-base">Real-Time Monitoring</h3>
+                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Live device status, bandwidth tracking, and performance analytics dashboard</p>
                         </div>
                     </div>
-                    <div className="flex items-start gap-3">
-                        <Icon name="settings" className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                    <div className="flex items-start gap-2 sm:gap-3">
+                        <Icon name="settings" className="w-5 sm:w-6 h-5 sm:h-6 text-green-500 flex-shrink-0 mt-0.5 sm:mt-1" />
                         <div>
-                            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Comprehensive Management</h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Control switches, routers, firewalls, DNS, wireless access points, and ACL rules</p>
+                            <h3 className="font-semibold text-gray-900 dark:text-white mb-0.5 sm:mb-1 text-sm sm:text-base">Comprehensive Management</h3>
+                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Control switches, routers, firewalls, DNS, wireless access points, and ACL rules</p>
                         </div>
                     </div>
                 </div>
-                <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-4 mb-6">
-                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
-                        <span className="font-semibold">🔐 Default Credentials:</span> Username: <code className="bg-black/10 dark:bg-white/10 px-2 py-1 rounded">admin</code> | Password: <code className="bg-black/10 dark:bg-white/10 px-2 py-1 rounded">admin</code>
+                <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg sm:rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
+                    <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
+                        <span className="font-semibold">🔐 Default Credentials:</span> Username: <code className="bg-black/10 dark:bg-white/10 px-2 py-1 rounded text-xs">admin</code> | Password: <code className="bg-black/10 dark:bg-white/10 px-2 py-1 rounded text-xs">admin</code>
                     </p>
                     <p className="text-xs text-gray-600 dark:text-gray-400">Change your password after first login for security</p>
                 </div>
                 <button 
                     onClick={onClose}
-                    className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl hover:opacity-90 transition-all transform hover:scale-105 shadow-lg"
+                    className="px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-sm sm:text-base rounded-lg sm:rounded-xl hover:opacity-90 transition-all transform hover:scale-105 shadow-lg"
                 >
                     Get Started →
                 </button>
@@ -1142,15 +1142,15 @@ const UserProfileModal = ({ onClose, userRole, startMfaSetup = false }) => {
 const StatCard = ({ icon, title, value, change, changeType, onClick }) => (
     <div onClick={onClick} className={onClick ? 'cursor-pointer' : ''}>
         <GlowingBorder className={onClick ? 'hover:shadow-xl hover:shadow-cyan-500/30 transition-all duration-300' : ''}>
-            <div className="p-3 md:p-5">
-                <div className="flex justify-between items-start mb-2 gap-2">
-                    <h3 className="text-gray-600 dark:text-gray-400 text-xs md:text-sm lg:text-lg flex-1">{title}</h3>
-                    <div className="p-1.5 md:p-2 bg-gray-300/50 dark:bg-gray-800/50 rounded-lg border border-cyan-500/10 dark:border-cyan-300/10 flex-shrink-0">
-                        <Icon name={icon} className="w-4 md:w-5 lg:w-6 h-4 md:h-5 lg:h-6 text-cyan-500 dark:text-cyan-400" />
+            <div className="p-2 sm:p-3 md:p-4 lg:p-5">
+                <div className="flex justify-between items-start mb-2 gap-1 sm:gap-2">
+                    <h3 className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm md:text-base lg:text-lg flex-1">{title}</h3>
+                    <div className="p-1 sm:p-1.5 md:p-2 bg-gray-300/50 dark:bg-gray-800/50 rounded-lg border border-cyan-500/10 dark:border-cyan-300/10 flex-shrink-0">
+                        <Icon name={icon} className="w-3.5 sm:w-4 md:w-5 lg:w-6 h-3.5 sm:h-4 md:h-5 lg:h-6 text-cyan-500 dark:text-cyan-400" />
                     </div>
                 </div>
-                <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">{value}</p>
-                <div className={`text-xs md:text-sm flex items-center ${changeType === 'increase' ? 'text-red-500' : changeType === 'decrease' ? 'text-green-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                <p className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-2">{value}</p>
+                <div className={`text-xs sm:text-sm md:text-sm flex items-center ${changeType === 'increase' ? 'text-red-500' : changeType === 'decrease' ? 'text-green-500' : 'text-gray-500 dark:text-gray-400'}`}>
                     {change}
                 </div>
             </div>
@@ -1445,15 +1445,15 @@ const DashboardView = ({ stats, bandwidthHistory, devices, loading = false, onSh
     const latencyChangeType = latencyChange > 0 ? 'increase' : 'decrease';
     
     return (
-        <div className="space-y-4 md:space-y-6">
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 lg:gap-6">
+        <div className="space-y-3 sm:space-y-4 md:space-y-6">
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
                 <StatCard icon="switch" title="Total Devices" value={totalDevices} change={`${statusCounts.Online} Online`} changeType="neutral" />
                 <StatCard icon="activity" title="Bandwidth" value={`${stats.currentBandwidth} Gbps`} change={bandwidthChange} changeType={bandwidthChangeType}/>
                 <StatCard icon="alert" title="Latency" value={`${stats.avgLatency} ms`} change={latencyChangeText} changeType={latencyChangeType}/>
                 <StatCard icon="shield" title="Critical Alerts" value={stats.criticalAlerts} change="Click to view" changeType="neutral" onClick={onShowAlerts}/>
             </div>
             <NetworkTopologyMap devices={devices} />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 auto-rows-max">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6 auto-rows-max">
                 <div className="lg:col-span-2">
                     <ChartCard title="Bandwidth Utilization" loading={loading}>
                         <div className="flex gap-2 mb-4 flex-wrap">
@@ -1461,7 +1461,7 @@ const DashboardView = ({ stats, bandwidthHistory, devices, loading = false, onSh
                                 <button
                                     key={range.value}
                                     onClick={() => setTimeRange(range.value)}
-                                    className={`px-3 py-1 text-sm rounded transition-colors ${
+                                    className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded transition-colors ${
                                         timeRange === range.value
                                             ? 'bg-cyan-500 text-white'
                                             : 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20'
@@ -5572,11 +5572,11 @@ function App() {
                         )}
                     </div>
                 ) : (
-                    <div className="relative z-10 flex min-h-screen">
+                    <div className="relative z-10 flex min-h-screen w-full overflow-x-hidden">
                         <Sidebar navItems={navItems} activeView={activeView} setActiveView={setActiveView} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
-                        <main className="flex-1 transition-all duration-300 md:ml-64">
-                            <div className="w-full max-w-7xl mx-auto px-2 sm:px-3 md:px-4 py-2 md:py-4">
-                                <div className="space-y-4 md:space-y-6">
+                        <main className="flex-1 transition-all duration-300 md:ml-64 w-full min-w-0">
+                            <div className="w-full max-w-7xl mx-auto px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4">
+                                <div className="space-y-3 sm:space-y-4 md:space-y-6">
                                     <Header 
                                         activeViewLabel={activeNavItem.label} 
                                         alertsCount={alerts.length} 
