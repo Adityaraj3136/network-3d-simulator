@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@variant dark (.dark &);
+
+/* Ensure proper text rendering in dark mode */
+html.dark {
+  color-scheme: dark;
+}
+
+html:not(.dark) {
+  color-scheme: light;
+}
