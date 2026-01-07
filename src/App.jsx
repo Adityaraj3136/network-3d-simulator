@@ -1,5 +1,73 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { BarChart, LineChart, PieChart, Bar, Line, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
+
+// --- Prevent Inspect/Tampering ---
+(() => {
+    // Disable right-click context menu
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    
+    // Disable F12, Ctrl+Shift+I, Ctrl+Shift+C, Ctrl+Shift+J, Ctrl+Shift+K
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'F12' || 
+            (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+            (e.ctrlKey && e.shiftKey && e.key === 'C') ||
+            (e.ctrlKey && e.shiftKey && e.key === 'J') ||
+            (e.ctrlKey && e.shiftKey && e.key === 'K')) {
+            e.preventDefault();
+        }
+    });
+    
+    // Detect DevTools opening via window size
+    let devtoolsDetected = false;
+    setInterval(() => {
+        const threshold = 160;
+        if (window.outerHeight - window.innerHeight > threshold ||
+            window.outerWidth - window.innerWidth > threshold) {
+            if (!devtoolsDetected) {
+                devtoolsDetected = true;
+                // Log warning for admin purposes only
+                if (localStorage.getItem('nms_session_active')) {
+                    // DevTools access detected
+                }
+            }
+        } else {
+            devtoolsDetected = false;
+        }
+    }, 500);
+})();
+
+// --- Password Reset Utility (Console Access) ---
+// Usage in browser console: resetAdminPassword('newPassword123')
+window.resetAdminPassword = function(newPassword) {
+    if (!newPassword || newPassword.length < 6) {
+        console.error('❌ Password must be at least 6 characters long');
+        return false;
+    }
+    
+    try {
+        const systemUsers = JSON.parse(localStorage.getItem('systemUsers') || '[]');
+        const adminIndex = systemUsers.findIndex(u => u.username === 'admin');
+        
+        if (adminIndex === -1) {
+            console.error('❌ Admin user not found');
+            return false;
+        }
+        
+        systemUsers[adminIndex].password = newPassword;
+        systemUsers[adminIndex].lastLogin = new Date().toISOString();
+        localStorage.setItem('systemUsers', JSON.stringify(systemUsers));
+        
+        console.log('✅ Admin password reset successfully!');
+        console.log('Username: admin');
+        console.log('New Password: ' + newPassword);
+        console.log('Email: adityaraj3136@gmail.com');
+        console.log('\n⚠️  Please reload the page and login with new credentials');
+        return true;
+    } catch (error) {
+        console.error('❌ Error resetting password:', error);
+        return false;
+    }
+};
 
 // --- Helper Components & Functions ---
 
@@ -53,12 +121,14 @@ const Icon = ({ name, className }) => {
     fan: <><path d="M10.5 2c.3 0 .6.1.8.3l1.4 1.4c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0L10 3.8V2.4c0-.2.2-.4.5-.4z"/><path d="M12 6 10 4M12 18l-2 2M6 12l-2-2M18 12l2 2"/><circle cx="12" cy="12" r="3"/></>,
     power: <><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></>,
     gauge: <><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></>,
+    help: <><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/></>,
+    moon: <><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></>,
   };
   return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name] || <circle cx="12" cy="12" r="10" />}</svg>;
 };
 
 const GlassPanel = ({ children, className = '', ...props }) => (
-  <div className={`bg-white/60 dark:bg-black/20 backdrop-blur-xl border border-cyan-500/20 dark:border-cyan-300/20 rounded-2xl shadow-lg shadow-cyan-500/10 ${className}`} {...props}>
+  <div className={`bg-white/60 dark:bg-black/20 backdrop-blur-md border border-cyan-500/20 dark:border-cyan-300/20 rounded-2xl shadow-lg shadow-cyan-500/10 ${className}`} {...props}>
     {children}
   </div>
 );
@@ -66,7 +136,7 @@ const GlassPanel = ({ children, className = '', ...props }) => (
 const GlowingBorder = ({ children, className = '', ...props }) => (
   <div className={`relative p-px rounded-2xl group transition-all duration-300 hover:shadow-cyan-500/30 hover:shadow-2xl ${className}`} {...props}>
     <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 opacity-30 group-hover:opacity-60 transition-opacity duration-300"></div>
-    <div className="relative bg-gray-200/80 dark:bg-gray-900/80 rounded-[15px] h-full transition-transform duration-300 group-hover:scale-[1.02]">
+    <div className="relative bg-gray-200/80 dark:bg-gray-900/80 rounded-[15px] h-full">
       {children}
     </div>
   </div>
@@ -393,7 +463,7 @@ const MFAVerificationPanel = ({ onVerify, onCancel, onReset }) => {
     );
 };
 
-const LoginPanel = ({ onLogin }) => {
+const LoginPanel = ({ onLogin, isLocked, lockTimeRemaining, onToggleTheme, isDarkMode }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -401,13 +471,21 @@ const LoginPanel = ({ onLogin }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        
+        if (isLocked) {
+            const minutes = Math.ceil(lockTimeRemaining / 60);
+            setError(`Too many failed attempts. Try again in ${minutes} minute(s).`);
+            return;
+        }
+        
         if (!username || !password) {
             setError('Please enter both username and password.');
             return;
         }
-        const success = await onLogin(username, password);
-        if (!success) {
-            setError('Invalid credentials. Please try again.');
+        const result = await onLogin(username, password);
+        if (!result.success) {
+            const attemptsLeft = 4 - result.attempts;
+            setError(`Invalid credentials. ${attemptsLeft} attempt(s) remaining.`);
         }
     };
 
@@ -422,12 +500,20 @@ const LoginPanel = ({ onLogin }) => {
     };
 
     return (
-        <GlassPanel className="w-full max-w-md p-8 mx-auto">
-            <div className="text-center mb-8">
-                <Icon name="network" className="w-16 h-16 text-cyan-500 dark:text-cyan-400 mx-auto mb-4" />
-                <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 tracking-wider">NMS Login</h1>
-                <p className="text-gray-600 dark:text-gray-400">Enter your credentials to access the dashboard.</p>
-            </div>
+        <div className="relative w-full max-w-md mx-auto">
+            <GlassPanel className="w-full p-8 relative">
+                <button
+                    onClick={onToggleTheme}
+                    className="absolute top-4 right-4 p-2 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/40 hover:to-blue-500/40 border border-cyan-500/30 hover:border-cyan-500/60 transition-all duration-200 shadow-lg hover:shadow-cyan-500/20 hover:shadow-xl"
+                    title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                >
+                    <Icon name="moon" className="w-5 h-5 text-cyan-500 dark:text-cyan-300 transition-transform hover:scale-110" />
+                </button>
+                <div className="text-center mb-8">
+                    <Icon name="network" className="w-16 h-16 text-cyan-500 dark:text-cyan-400 mx-auto mb-4" />
+                    <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 tracking-wider">NMS Login</h1>
+                    <p className="text-gray-600 dark:text-gray-400">Enter your credentials to access the dashboard.</p>
+                </div>
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Username</label>
@@ -440,12 +526,47 @@ const LoginPanel = ({ onLogin }) => {
                 <div className="flex justify-between items-center">
                     <button type="button" onClick={handleForgot} className="text-sm text-cyan-600 dark:text-cyan-300 hover:underline">Forgot password?</button>
                 </div>
-                {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                <button type="submit" className="w-full p-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-lg hover:opacity-90 transition-opacity">
-                    Login
+                {error && (
+                    <div className="space-y-2">
+                        <p className="text-red-500 text-sm text-center">{error}</p>
+                        {!isLocked && error.includes('Invalid credentials') && (
+                            <div className="flex items-center justify-center gap-2">
+                                {[1, 2, 3, 4].map(attempt => (
+                                    <div
+                                        key={attempt}
+                                        className={`h-2 w-12 rounded-full transition-all ${
+                                            attempt <= (4 - parseInt(error.match(/\d+/)?.[0] || 0))
+                                                ? 'bg-red-500'
+                                                : 'bg-gray-300 dark:bg-gray-600'
+                                        }`}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+                <button type="submit" disabled={isLocked} className={`w-full p-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-lg transition-opacity ${
+                    isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'
+                }`}>
+                    {isLocked ? `Locked (${Math.ceil(lockTimeRemaining / 60)}m)` : 'Login'}
                 </button>
             </form>
-        </GlassPanel>
+            <div className="mt-6 pt-4 border-t border-cyan-500/20 text-center space-y-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Made with <span className="text-red-500">❤️</span> by <span className="font-semibold text-cyan-600 dark:text-cyan-400">Aditya Raj</span>
+                </p>
+                <a 
+                    href="https://adityaraj3136.github.io/contact/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline inline-flex items-center gap-1"
+                >
+                    <Icon name="help" className="w-3 h-3" />
+                    Report Issue / Feedback
+                </a>
+            </div>
+            </GlassPanel>
+        </div>
     );
 };
 
@@ -485,28 +606,109 @@ const Sidebar = ({ navItems, activeView, setActiveView, isSidebarOpen, setIsSide
     );
 };
 
-const Header = ({ activeViewLabel, alertsCount, onLogout, onShowAlerts, onToggleSidebar, onToggleProfile, currentTime, timezone, userRole }) => (
-    <GlassPanel className="w-full p-3 sm:p-4 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-            <button onClick={onToggleSidebar} className="md:hidden p-1 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white">
-                <Icon name="menu" className="w-6 h-6" />
+const WelcomeModal = ({ onClose }) => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md" onClick={onClose}>
+        <div className="w-full max-w-2xl bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 rounded-3xl shadow-2xl border-2 border-cyan-500/30 overflow-hidden animate-[fadeIn_0.5s_ease-out]" onClick={(e) => e.stopPropagation()}>
+            <div className="p-8 text-center">
+                <div className="mb-6 flex justify-center">
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-cyan-500 rounded-full blur-xl opacity-50 animate-pulse" />
+                        <Icon name="network" className="w-24 h-24 text-cyan-500 dark:text-cyan-400 relative" />
+                    </div>
+                </div>
+                <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-3 bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+                    Welcome to NMS Dashboard
+                </h2>
+                <p className="text-xl text-gray-700 dark:text-gray-300 mb-6 font-semibold">
+                    Network Management System - Firewall Simulation Web UI
+                </p>
+                <div className="bg-white/50 dark:bg-black/20 rounded-2xl p-6 mb-6 text-left space-y-4">
+                    <div className="flex items-start gap-3">
+                        <Icon name="shieldCheck" className="w-6 h-6 text-cyan-500 flex-shrink-0 mt-1" />
+                        <div>
+                            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Advanced Security Features</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Multi-factor authentication, role-based access control, and real-time threat monitoring</p>
+                        </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                        <Icon name="activity" className="w-6 h-6 text-blue-500 flex-shrink-0 mt-1" />
+                        <div>
+                            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Real-Time Monitoring</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Live device status, bandwidth tracking, and performance analytics dashboard</p>
+                        </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                        <Icon name="settings" className="w-6 h-6 text-green-500 flex-shrink-0 mt-1" />
+                        <div>
+                            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Comprehensive Management</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Control switches, routers, firewalls, DNS, wireless access points, and ACL rules</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-4 mb-6">
+                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                        <span className="font-semibold">🔐 Default Credentials:</span> Username: <code className="bg-black/10 dark:bg-white/10 px-2 py-1 rounded">admin</code> | Password: <code className="bg-black/10 dark:bg-white/10 px-2 py-1 rounded">admin</code>
+                    </p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Change your password after first login for security</p>
+                </div>
+                <button 
+                    onClick={onClose}
+                    className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl hover:opacity-90 transition-all transform hover:scale-105 shadow-lg"
+                >
+                    Get Started →
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
+const FeedbackModal = ({ onClose }) => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+        <div className="w-full max-w-4xl h-[90vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-cyan-500/20 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-cyan-500/20 flex items-center justify-between bg-gradient-to-r from-cyan-500/10 to-blue-500/10">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">Report Issue / Feedback</h3>
+                <button onClick={onClose} className="p-2 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg transition-colors">
+                    <Icon name="x" className="w-6 h-6 text-gray-600 dark:text-gray-300" />
+                </button>
+            </div>
+            <iframe 
+                src="https://adityaraj3136.github.io/contact/" 
+                className="w-full h-[calc(100%-4rem)] border-0"
+                title="Contact Form"
+                sandbox="allow-same-origin allow-scripts allow-forms"
+            />
+        </div>
+    </div>
+);
+
+const Header = ({ activeViewLabel, alertsCount, onLogout, onShowAlerts, onToggleSidebar, onToggleProfile, currentTime, timezone, userRole, onShowFeedback, criticalAlertsCount, onToggleTheme, isDarkMode }) => (
+    <GlassPanel className="w-full p-2 sm:p-3 md:p-4 flex justify-between items-center gap-2 md:gap-4">
+        <div className="flex items-center gap-2 md:gap-4 min-w-0">
+            <button onClick={onToggleSidebar} className="md:hidden p-1 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white flex-shrink-0">
+                <Icon name="menu" className="w-5 md:w-6 h-5 md:h-6" />
             </button>
-            <h2 className="text-xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 capitalize">{activeViewLabel}</h2>
+            <h2 className="text-lg md:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100 capitalize truncate">{activeViewLabel}</h2>
             {userRole === 'viewer' && (
-                <span className="px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-bold rounded-full">READ-ONLY MODE</span>
+                <span className="px-2 md:px-3 py-0.5 md:py-1 bg-blue-500/20 text-blue-400 text-xs font-bold rounded-full whitespace-nowrap">READ-ONLY</span>
             )}
         </div>
-        <div className="flex items-center gap-4 sm:gap-6">
-            <div className="hidden sm:flex items-center gap-2 text-cyan-600 dark:text-cyan-300">
-                <Icon name="clock" className="w-6 h-6" />
-                <span className="font-mono text-sm">
+        <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
+            <div className="hidden sm:flex items-center gap-1 md:gap-2 text-cyan-600 dark:text-cyan-300">
+                <Icon name="clock" className="w-4 md:w-5 lg:w-6 h-4 md:h-5 lg:h-6 flex-shrink-0" />
+                <span className="font-mono text-xs md:text-sm">
                     {currentTime.toLocaleTimeString('en-US', { timeZone: timezone, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
             </div>
             <div className="flex items-center gap-3 sm:gap-4">
+                <button onClick={onToggleTheme} className="p-2 rounded-full hover:bg-cyan-500/10 transition-colors" title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+                    <Icon name="moon" className="w-6 h-6 text-cyan-500 dark:text-cyan-400" />
+                </button>
+                <button onClick={onShowFeedback} className="p-2 rounded-full hover:bg-cyan-500/10 transition-colors" title="Report Issue / Feedback">
+                    <Icon name="help" className="w-6 h-6 text-cyan-500 dark:text-cyan-400" />
+                </button>
                 <button onClick={onShowAlerts} className="relative p-2 rounded-full hover:bg-cyan-500/10 transition-colors">
                     <Icon name="alert" className="w-6 h-6 text-yellow-500 dark:text-yellow-400" />
-                    {alertsCount > 0 && <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">{alertsCount}</span>}
+                    {criticalAlertsCount > 0 && <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">{criticalAlertsCount}</span>}
                 </button>
                 <button onClick={onToggleProfile} className="flex items-center gap-3 p-1 rounded-full hover:bg-cyan-500/10 transition-colors">
                     <img src="https://placehold.co/40x40/0A0A0A/31C48D?text=A" alt="Admin" className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-cyan-500 dark:border-cyan-400"/>
@@ -550,14 +752,25 @@ const AlertsPanel = ({ alerts, onClose }) => {
     );
 };
 
-const ProfileDropdown = ({ onLogout, onShowProfile, onShowChangePassword, onShowMfaSettings }) => {
+const ProfileDropdown = ({ onLogout, onShowProfile, onShowChangePassword, onShowMfaSettings, onClose }) => {
     const menuItems = [
         { label: 'User Profile', icon: 'user', action: onShowProfile },
         { label: 'Change Password', icon: 'lock', action: onShowChangePassword },
         { label: 'MFA Settings', icon: 'shieldCheck', action: onShowMfaSettings },
     ];
+    
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (!e.target.closest('.profile-dropdown') && !e.target.closest('button[title="Profile"]')) {
+                onClose();
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [onClose]);
+    
     return (
-        <div className="fixed top-24 right-4 z-40">
+        <div className="fixed top-24 right-4 z-40 profile-dropdown">
             <GlassPanel className="w-64">
                 <div className="p-2">
                     {menuItems.map(item => (
@@ -581,6 +794,24 @@ const ChangePasswordModal = ({ onClose }) => {
     const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
     const [message, setMessage] = useState('');
     const [messageType, setMessageType] = useState('');
+    
+    const calculatePasswordStrength = (password) => {
+        if (!password) return { score: 0, label: '', color: '' };
+        let score = 0;
+        if (password.length >= 8) score++;
+        if (password.length >= 12) score++;
+        if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+        if (/\d/.test(password)) score++;
+        if (/[^a-zA-Z0-9]/.test(password)) score++;
+        
+        if (score <= 1) return { score: 20, label: 'Weak', color: 'bg-red-500' };
+        if (score === 2) return { score: 40, label: 'Fair', color: 'bg-orange-500' };
+        if (score === 3) return { score: 60, label: 'Good', color: 'bg-yellow-500' };
+        if (score === 4) return { score: 80, label: 'Strong', color: 'bg-lime-500' };
+        return { score: 100, label: 'Very Strong', color: 'bg-green-500' };
+    };
+    
+    const strength = calculatePasswordStrength(passwords.new);
 
     useEffect(() => {
         const onKey = (e) => {
@@ -657,6 +888,20 @@ const ChangePasswordModal = ({ onClose }) => {
                     <div>
                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">New Password</label>
                         <input type="password" name="new" value={passwords.new} onChange={handleChange} className="w-full p-3 bg-gray-200/50 dark:bg-black/30 border border-cyan-500/20 dark:border-cyan-300/20 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:outline-none transition" placeholder="Enter new password (min 8 characters)" />
+                        {passwords.new && (
+                            <div className="mt-2 space-y-1">
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-gray-600 dark:text-gray-400">Password Strength:</span>
+                                    <span className={`font-semibold ${strength.color.replace('bg-', 'text-')}`}>{strength.label}</span>
+                                </div>
+                                <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                    <div className={`h-full ${strength.color} transition-all duration-300`} style={{ width: `${strength.score}%` }} />
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Use 8+ characters with uppercase, lowercase, numbers & symbols
+                                </p>
+                            </div>
+                        )}
                     </div>
                     <div>
                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Confirm Password</label>
@@ -894,21 +1139,23 @@ const UserProfileModal = ({ onClose, userRole, startMfaSetup = false }) => {
     );
 };
 
-const StatCard = ({ icon, title, value, change, changeType }) => (
-    <GlowingBorder>
-        <div className="p-5">
-            <div className="flex justify-between items-start mb-2">
-                <h3 className="text-gray-600 dark:text-gray-400 text-lg">{title}</h3>
-                <div className="p-2 bg-gray-300/50 dark:bg-gray-800/50 rounded-lg border border-cyan-500/10 dark:border-cyan-300/10">
-                    <Icon name={icon} className="w-6 h-6 text-cyan-500 dark:text-cyan-400" />
+const StatCard = ({ icon, title, value, change, changeType, onClick }) => (
+    <div onClick={onClick} className={onClick ? 'cursor-pointer' : ''}>
+        <GlowingBorder className={onClick ? 'hover:shadow-xl hover:shadow-cyan-500/30 transition-all duration-300' : ''}>
+            <div className="p-3 md:p-5">
+                <div className="flex justify-between items-start mb-2 gap-2">
+                    <h3 className="text-gray-600 dark:text-gray-400 text-xs md:text-sm lg:text-lg flex-1">{title}</h3>
+                    <div className="p-1.5 md:p-2 bg-gray-300/50 dark:bg-gray-800/50 rounded-lg border border-cyan-500/10 dark:border-cyan-300/10 flex-shrink-0">
+                        <Icon name={icon} className="w-4 md:w-5 lg:w-6 h-4 md:h-5 lg:h-6 text-cyan-500 dark:text-cyan-400" />
+                    </div>
+                </div>
+                <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">{value}</p>
+                <div className={`text-xs md:text-sm flex items-center ${changeType === 'increase' ? 'text-red-500' : changeType === 'decrease' ? 'text-green-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                    {change}
                 </div>
             </div>
-            <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">{value}</p>
-            <div className={`text-sm flex items-center ${changeType === 'increase' ? 'text-red-500' : changeType === 'decrease' ? 'text-green-500' : 'text-gray-500 dark:text-gray-400'}`}>
-                {change}
-            </div>
-        </div>
-    </GlowingBorder>
+        </GlowingBorder>
+    </div>
 );
 
 const Skeleton = ({ className = '' }) => (
@@ -1031,48 +1278,129 @@ const EnvironmentalCard = ({ device }) => {
 };
 
 
-const NetworkTopologyMap = () => (
-    <GlassPanel className="p-4 h-[500px] overflow-hidden relative">
-        <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">Network Topology</h3>
-        <svg width="100%" height="100%" viewBox="0 0 800 400">
-            <defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(0, 255, 255, 0.05)" strokeWidth="0.5"/></pattern></defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-            <g className="connections opacity-40">
-                <line x1="100" y1="200" x2="250" y2="100" stroke="#00ffff" strokeWidth="2" /><line x1="100" y1="200" x2="250" y2="300" stroke="#00ffff" strokeWidth="2" /><line x1="250" y1="100" x2="400" y2="100" stroke="#00ffff" strokeWidth="2" /><line x1="250" y1="300" x2="400" y2="300" stroke="#00ffff" strokeWidth="2" /><line x1="400" y1="100" x2="550" y2="200" stroke="#00ffff" strokeWidth="2" /><line x1="400" y1="300" x2="550" y2="200" stroke="#00ffff" strokeWidth="2" /><line x1="550" y1="200" x2="700" y2="100" stroke="#00ffff" strokeWidth="2" /><line x1="550" y1="200" x2="700" y2="300" stroke="#00ffff" strokeWidth="2" />
-            </g>
-            <circle cx="0" cy="0" r="4" fill="#39ff14"><animateMotion dur="3s" repeatCount="indefinite" path="M100,200 L250,100" /></circle>
-            <circle cx="0" cy="0" r="4" fill="#39ff14"><animateMotion dur="4s" repeatCount="indefinite" path="M250,300 L400,300" /></circle>
-            <circle cx="0" cy="0" r="4" fill="#ff073a"><animateMotion dur="2.5s" repeatCount="indefinite" path="M550,200 L700,300" /></circle>
-            {[{x: 100, y: 200, label: 'R1-EDGE', type: 'router'}, {x: 250, y: 100, label: 'S1-CORE', type: 'switch'}, {x: 250, y: 300, label: 'S2-CORE', type: 'switch'}, {x: 400, y: 100, label: 'FW-01', type: 'firewall'}, {x: 400, y: 300, label: 'FW-02', type: 'firewall'}, {x: 550, y: 200, label: 'R2-INT', type: 'router'}, {x: 700, y: 100, label: 'SRV-01', type: 'server'}, {x: 700, y: 300, label: 'SRV-02', type: 'server'}].map(node => (
-                <g key={node.label} transform={`translate(${node.x}, ${node.y})`} className="cursor-pointer group">
-                    <circle cx="0" cy="0" r="25" fill="#0d1f2d" stroke="#00ffff" strokeWidth="2" className="group-hover:stroke-yellow-400 transition-all"/><circle cx="0" cy="0" r="28" fill="transparent" stroke="#00ffff" strokeWidth="1" strokeDasharray="4 4" className="opacity-30 group-hover:opacity-70 animate-spin-slow"/><text x="0" y="4" textAnchor="middle" fill="#e0e0e0" fontSize="10" className="font-sans">{node.type.charAt(0).toUpperCase()}</text><text x="0" y="45" textAnchor="middle" fill="#cccccc" fontSize="12" className="font-semibold tracking-wider group-hover:fill-white">{node.label}</text>
+const NetworkTopologyMap = ({ devices = [] }) => {
+    const [hoveredNode, setHoveredNode] = useState(null);
+    
+    const nodeMapping = {
+        'R1-EDGE': 'NetAdmin Pro Router',
+        'S1-CORE': 'Cisco Catalyst 9300-24T',
+        'S2-CORE': 'Cisco Catalyst 9300-24T',
+        'FW-01': 'Palo Alto PA-220',
+        'FW-02': 'Palo Alto PA-220',
+        'R2-INT': 'NetAdmin Pro Router',
+        'SRV-01': 'Dell PowerEdge R740',
+        'SRV-02': 'Dell PowerEdge R740'
+    };
+    
+    const getNodeStatus = (label) => {
+        const deviceId = nodeMapping[label];
+        const device = devices && devices.length > 0 ? devices.find(d => d.id === deviceId) : null;
+        
+        if (!device) return 'offline';
+        return device.status === 'Online' ? 'online' : device.status === 'Warning' ? 'warning' : 'offline';
+    };
+    
+    const getStatusColor = (status) => {
+        const colors = { online: '#00ff88', warning: '#ffbb28', offline: '#ff4444' };
+        return colors[status] || colors.offline;
+    };
+    
+    const getStatusText = (status) => {
+        return status === 'online' ? '🟢 Online' : status === 'warning' ? '🟡 Warning' : '🔴 Offline';
+    };
+    
+    const nodeList = [
+        {x: 100, y: 200, label: 'R1-EDGE', type: 'router'}, 
+        {x: 250, y: 100, label: 'S1-CORE', type: 'switch'}, 
+        {x: 250, y: 300, label: 'S2-CORE', type: 'switch'}, 
+        {x: 400, y: 100, label: 'FW-01', type: 'firewall'}, 
+        {x: 400, y: 300, label: 'FW-02', type: 'firewall'}, 
+        {x: 550, y: 200, label: 'R2-INT', type: 'router'}, 
+        {x: 700, y: 100, label: 'SRV-01', type: 'server'}, 
+        {x: 700, y: 300, label: 'SRV-02', type: 'server'}
+    ];
+    
+    return (
+        <GlassPanel className="p-4 h-[300px] md:h-[500px] overflow-hidden relative">
+            <h3 className="text-lg md:text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">Network Topology</h3>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Hover over nodes to see device mapping</div>
+            <svg width="100%" height="100%" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid meet" className="w-full h-full">
+                <defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(0, 255, 255, 0.05)" strokeWidth="0.5"/></pattern></defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+                <g className="connections opacity-40">
+                    <line x1="100" y1="200" x2="250" y2="100" stroke="#00ffff" strokeWidth="2" /><line x1="100" y1="200" x2="250" y2="300" stroke="#00ffff" strokeWidth="2" /><line x1="250" y1="100" x2="400" y2="100" stroke="#00ffff" strokeWidth="2" /><line x1="250" y1="300" x2="400" y2="300" stroke="#00ffff" strokeWidth="2" /><line x1="400" y1="100" x2="550" y2="200" stroke="#00ffff" strokeWidth="2" /><line x1="400" y1="300" x2="550" y2="200" stroke="#00ffff" strokeWidth="2" /><line x1="550" y1="200" x2="700" y2="100" stroke="#00ffff" strokeWidth="2" /><line x1="550" y1="200" x2="700" y2="300" stroke="#00ffff" strokeWidth="2" />
                 </g>
-            ))}
-        </svg>
-    </GlassPanel>
-);
+                <circle cx="0" cy="0" r="4" fill="#39ff14"><animateMotion dur="3s" repeatCount="indefinite" path="M100,200 L250,100" /></circle>
+                <circle cx="0" cy="0" r="4" fill="#39ff14"><animateMotion dur="4s" repeatCount="indefinite" path="M250,300 L400,300" /></circle>
+                <circle cx="0" cy="0" r="4" fill="#ff073a"><animateMotion dur="2.5s" repeatCount="indefinite" path="M550,200 L700,300" /></circle>
+                {nodeList.map(node => {
+                    const status = getNodeStatus(node.label);
+                    const statusColor = getStatusColor(status);
+                    const deviceName = nodeMapping[node.label];
+                    const isHovered = hoveredNode === node.label;
+                    return (
+                        <g 
+                            key={node.label} 
+                            transform={`translate(${node.x}, ${node.y})`} 
+                            className="cursor-pointer group"
+                            onMouseEnter={() => setHoveredNode(node.label)}
+                            onMouseLeave={() => setHoveredNode(null)}
+                        >
+                            <circle cx="0" cy="0" r="25" fill="#0d1f2d" stroke={statusColor} strokeWidth={isHovered ? "3" : "2"} className="transition-all group-hover:stroke-yellow-400"/>
+                            <circle cx="0" cy="0" r={isHovered ? "32" : "28"} fill="transparent" stroke={statusColor} strokeWidth="1" strokeDasharray="4 4" className="opacity-30 group-hover:opacity-70 animate-spin-slow transition-all"/>
+                            {isHovered && (
+                                <>
+                                    <rect x="-60" y="-75" width="120" height="70" rx="8" fill="#1a1a2e" stroke={statusColor} strokeWidth="1.5" opacity="0.95"/>
+                                    <text x="0" y="-60" textAnchor="middle" fill={statusColor} fontSize="11" className="font-bold">{node.label}</text>
+                                    <text x="0" y="-45" textAnchor="middle" fill="#e0e0e0" fontSize="9">{deviceName}</text>
+                                    <text x="0" y="-30" textAnchor="middle" fill={statusColor} fontSize="9">{getStatusText(status)}</text>
+                                </>
+                            )}
+                            <text x="0" y="4" textAnchor="middle" fill="#e0e0e0" fontSize="10" className="font-sans">{node.type.charAt(0).toUpperCase()}</text>
+                            <text x="0" y="45" textAnchor="middle" fill="#cccccc" fontSize="12" className="font-semibold tracking-wider group-hover:fill-white">{node.label}</text>
+                        </g>
+                    );
+                })}
+            </svg>
+        </GlassPanel>
+    );
+};
 
 const DeviceTable = ({ devices }) => (
-    <GlassPanel className="p-4 overflow-x-auto">
-        <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Device List</h3>
-        <table className="w-full text-left table-auto">
-            <thead>
-                <tr className="border-b border-cyan-500/20 dark:border-cyan-300/20">
-                    <th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Device ID</th><th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hidden sm:table-cell">Type</th><th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300">IP Address</th><th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Status</th><th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">CPU</th><th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">Memory</th><th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hidden lg:table-cell">Uptime</th>
-                </tr>
-            </thead>
-            <tbody>
-                {devices.map((device) => (
-                    <tr key={device.id} className="border-b border-cyan-500/10 dark:border-cyan-300/10 hover:bg-cyan-500/10 transition-colors">
-                        <td className="p-3 text-gray-800 dark:text-gray-200 font-mono text-sm">{device.id}</td><td className="p-3 text-gray-600 dark:text-gray-300 hidden sm:table-cell">{device.type}</td><td className="p-3 text-gray-600 dark:text-gray-300 font-mono text-sm">{device.ip}</td><td className="p-3"><span className={`px-2 py-1 text-xs rounded-full ${device.status === 'Online' ? 'bg-green-500/20 text-green-700 dark:text-green-300' : device.status === 'Warning' ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300' : 'bg-red-500/20 text-red-700 dark:text-red-300'}`}>{device.status}</span></td><td className="p-3 text-gray-600 dark:text-gray-300 hidden md:table-cell">{device.cpu}%</td><td className="p-3 text-gray-600 dark:text-gray-300 hidden md:table-cell">{device.mem}%</td><td className="p-3 text-gray-600 dark:text-gray-300 hidden lg:table-cell">{formatUptime(device.bootTime)}</td>
+    <GlassPanel className="p-3 md:p-4 overflow-x-auto">
+        <h3 className="text-lg md:text-xl font-semibold text-gray-800 dark:text-gray-200 mb-3 md:mb-4">Device List</h3>
+        <div className="overflow-x-auto -mx-3 md:-mx-4 md:mx-0">
+            <table className="w-full text-left table-auto">
+                <thead>
+                    <tr className="border-b border-cyan-500/20 dark:border-cyan-300/20">
+                        <th className="p-2 md:p-3 text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-300">Device</th>
+                        <th className="p-2 md:p-3 text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-300 hidden sm:table-cell">Type</th>
+                        <th className="p-2 md:p-3 text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-300">IP</th>
+                        <th className="p-2 md:p-3 text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-300">Status</th>
+                        <th className="p-2 md:p-3 text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">CPU</th>
+                        <th className="p-2 md:p-3 text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">Mem</th>
+                        <th className="p-2 md:p-3 text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-300 hidden lg:table-cell">Uptime</th>
                     </tr>
-                ))}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {devices.map((device) => (
+                        <tr key={device.id} className="border-b border-cyan-500/10 dark:border-cyan-300/10 hover:bg-cyan-500/10 transition-colors">
+                            <td className="p-2 md:p-3 text-gray-800 dark:text-gray-200 font-mono text-xs md:text-sm truncate max-w-[100px] md:max-w-none">{device.id}</td>
+                            <td className="p-2 md:p-3 text-gray-600 dark:text-gray-300 hidden sm:table-cell text-xs md:text-sm">{device.type}</td>
+                            <td className="p-2 md:p-3 text-gray-600 dark:text-gray-300 font-mono text-xs md:text-sm">{device.ip}</td>
+                            <td className="p-2 md:p-3"><span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${device.status === 'Online' ? 'bg-green-500/20 text-green-700 dark:text-green-300' : device.status === 'Warning' ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300' : 'bg-red-500/20 text-red-700 dark:text-red-300'}`}>{device.status}</span></td>
+                            <td className="p-2 md:p-3 text-gray-600 dark:text-gray-300 hidden md:table-cell text-xs md:text-sm">{device.cpu}%</td>
+                            <td className="p-2 md:p-3 text-gray-600 dark:text-gray-300 hidden md:table-cell text-xs md:text-sm">{device.mem}%</td>
+                            <td className="p-2 md:p-3 text-gray-600 dark:text-gray-300 hidden lg:table-cell text-xs md:text-sm">{formatUptime(device.bootTime)}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
     </GlassPanel>
 );
 
-const DashboardView = ({ stats, bandwidthHistory, devices, loading = false }) => {
+const DashboardView = ({ stats, bandwidthHistory, devices, loading = false, onShowAlerts }) => {
     const [timeRange, setTimeRange] = useState('1h');
     const categorizeDeviceStatus = (status = '') => {
         const normalized = status.toLowerCase();
@@ -1117,18 +1445,18 @@ const DashboardView = ({ stats, bandwidthHistory, devices, loading = false }) =>
     const latencyChangeType = latencyChange > 0 ? 'increase' : 'decrease';
     
     return (
-        <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="space-y-4 md:space-y-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 lg:gap-6">
                 <StatCard icon="switch" title="Total Devices" value={totalDevices} change={`${statusCounts.Online} Online`} changeType="neutral" />
                 <StatCard icon="activity" title="Bandwidth" value={`${stats.currentBandwidth} Gbps`} change={bandwidthChange} changeType={bandwidthChangeType}/>
                 <StatCard icon="alert" title="Latency" value={`${stats.avgLatency} ms`} change={latencyChangeText} changeType={latencyChangeType}/>
-                <StatCard icon="shield" title="Critical Alerts" value={stats.criticalAlerts} change="No change" changeType="neutral"/>
+                <StatCard icon="shield" title="Critical Alerts" value={stats.criticalAlerts} change="Click to view" changeType="neutral" onClick={onShowAlerts}/>
             </div>
-            <NetworkTopologyMap />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-max">
+            <NetworkTopologyMap devices={devices} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 auto-rows-max">
                 <div className="lg:col-span-2">
                     <ChartCard title="Bandwidth Utilization" loading={loading}>
-                        <div className="flex gap-2 mb-4">
+                        <div className="flex gap-2 mb-4 flex-wrap">
                             {timeRanges.map(range => (
                                 <button
                                     key={range.value}
@@ -1331,7 +1659,31 @@ const AclView = ({ rules, onAddRule, onEditRule, onDeleteRule, onToggleRule, onR
     const [showForm, setShowForm] = useState(false);
     const [editingRule, setEditingRule] = useState(null);
     const [ruleToDelete, setRuleToDelete] = useState(null);
+    const [activeTab, setActiveTab] = useState('rules');
     const isReadOnly = userRole === 'viewer';
+
+    const [aclFeatures, setAclFeatures] = useState({
+        addressReservations: [
+            { id: 1, mac: '00:1A:2B:3C:4D:5E', ipAddress: '192.168.1.100', device: 'Printer', enabled: true },
+            { id: 2, mac: 'A8:F2:78:9A:BC:DE', ipAddress: '192.168.1.101', device: 'NAS Storage', enabled: true }
+        ],
+        blacklist: [
+            { id: 1, entry: '192.168.1.50', type: 'IP', reason: 'Suspicious activity', enabled: true },
+            { id: 2, entry: '00:11:22:33:44:55', type: 'MAC', reason: 'Unauthorized device', enabled: true }
+        ],
+        whitelist: [
+            { id: 1, entry: '192.168.1.1', type: 'IP', device: 'Router', enabled: true },
+            { id: 2, entry: '08:00:27:BE:EF:01', type: 'MAC', device: 'Work PC', enabled: true }
+        ],
+        parentalControls: [
+            { id: 1, device: 'Kid-Tablet', blockedCategories: ['Adult', 'Gaming', 'Social Media'], timeLimit: '2 hours', enabled: true },
+            { id: 2, device: 'Guest-Device', blockedCategories: ['Adult'], timeLimit: 'Unlimited', enabled: false }
+        ],
+        qosRules: [
+            { id: 1, device: 'Gaming PC', priority: 'High', bandwidth: '100 Mbps', protocol: 'All', enabled: true },
+            { id: 2, device: 'Video Streaming', priority: 'Medium', bandwidth: '50 Mbps', protocol: 'TCP', enabled: true }
+        ]
+    });
 
     const handleSave = (rule) => {
         if (rule.id) {
@@ -1362,73 +1714,502 @@ const AclView = ({ rules, onAddRule, onEditRule, onDeleteRule, onToggleRule, onR
         }
         setRuleToDelete(null);
     };
+
+    const handleAclUpdate = (featureType, action, data) => {
+        setAclFeatures(prev => {
+            const key = featureType === 'addressReservation' ? 'addressReservations' 
+                      : featureType === 'blacklist' ? 'blacklist'
+                      : featureType === 'whitelist' ? 'whitelist'
+                      : featureType === 'parentalControl' ? 'parentalControls'
+                      : 'qosRules';
+            
+            if (action === 'add') {
+                return { ...prev, [key]: [...prev[key], data] };
+            } else if (action === 'edit') {
+                return { ...prev, [key]: prev[key].map(item => item.id === data.id ? data : item) };
+            } else if (action === 'delete') {
+                return { ...prev, [key]: prev[key].filter(item => item.id !== data.id) };
+            }
+            return prev;
+        });
+    };
+
+    const tabs = [
+        { id: 'rules', label: 'Access Rules', icon: 'shield' },
+        { id: 'addressReservation', label: 'Address Reservation', icon: 'network' },
+        { id: 'blacklist', label: 'Blacklist', icon: 'x' },
+        { id: 'whitelist', label: 'Whitelist', icon: 'sparkles' },
+        { id: 'parentalControl', label: 'Parental Control', icon: 'lock' },
+        { id: 'qos', label: 'QoS (Quality of Service)', icon: 'activity' }
+    ];
     
     return (
         <div className="space-y-6">
-            <GlassPanel className="p-4 flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Access Control List</h3>
-                {!isReadOnly && (
-                    <button onClick={() => openForm()} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:opacity-90 transition-opacity">
-                        <Icon name={'plus'} className="w-5 h-5" />
-                        <span>Add Rule</span>
-                    </button>
-                )}
+            <GlassPanel className="p-4">
+                <h3 className="text-lg md:text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Access Control & Network Management</h3>
+                <div className="flex flex-wrap gap-1 md:gap-2 overflow-x-auto">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`px-3 md:px-4 py-2 rounded-lg transition-all whitespace-nowrap flex items-center gap-2 ${
+                                activeTab === tab.id
+                                    ? 'bg-cyan-500 text-white font-semibold'
+                                    : 'bg-gray-300/20 dark:bg-gray-700/30 text-gray-700 dark:text-gray-300 hover:bg-cyan-500/20'
+                            }`}
+                        >
+                            <Icon name={tab.icon} className="w-4 h-4" />
+                            <span className="text-xs md:text-sm">{tab.label}</span>
+                        </button>
+                    ))}
+                </div>
             </GlassPanel>
 
-            {showForm && <AclRuleForm onSave={handleSave} onCancel={closeForm} initialData={editingRule} />}
-            
-            {ruleToDelete && (
+            {activeTab === 'rules' && (
+                <>
+                    <GlassPanel className="p-4 flex justify-between items-center">
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Access Control Rules</h3>
+                        {!isReadOnly && (
+                            <button onClick={() => openForm()} className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:opacity-90 transition-opacity text-sm">
+                                <Icon name={'plus'} className="w-5 h-5" />
+                                <span>Add Rule</span>
+                            </button>
+                        )}
+                    </GlassPanel>
+
+                    {showForm && <AclRuleForm onSave={handleSave} onCancel={closeForm} initialData={editingRule} />}
+                    
+                    {ruleToDelete && (
+                        <ConfirmationModal
+                            title="Delete ACL Rule"
+                            message={`Are you sure you want to delete this rule? (Source: ${ruleToDelete.source}, Action: ${ruleToDelete.action})`}
+                            onConfirm={confirmDelete}
+                            onCancel={() => setRuleToDelete(null)}
+                            confirmText="Delete"
+                            confirmColor="red"
+                        />
+                    )}
+
+                    <GlassPanel className="p-4 overflow-x-auto">
+                        <table className="w-full text-left table-auto text-sm">
+                            <thead>
+                                <tr className="border-b border-cyan-500/20 dark:border-cyan-300/20">
+                                    <th className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300 w-24">Order</th>
+                                    <th className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300">Status</th>
+                                    <th className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300">Action</th>
+                                    <th className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">Protocol</th>
+                                    <th className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300">Source</th>
+                                    <th className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300 hidden sm:table-cell">Destination</th>
+                                    <th className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">Port</th>
+                                    <th className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300">Hits</th>
+                                    {!isReadOnly && <th className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300">Actions</th>}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rules.map((rule, index) => (
+                                    <tr key={rule.id} className="border-b border-cyan-500/10 dark:border-cyan-300/10 hover:bg-cyan-500/10 group">
+                                        <td className="p-2 md:p-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono text-cyan-600 dark:text-cyan-300 text-xs md:text-sm">{index + 1}</span>
+                                                {!isReadOnly && (
+                                                    <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => onReorderRule(index, 'up')} disabled={index === 0} className="disabled:opacity-20"><Icon name="arrowUp" className="w-3 h-3" /></button>
+                                                        <button onClick={() => onReorderRule(index, 'down')} disabled={index === rules.length - 1} className="disabled:opacity-20"><Icon name="arrowDown" className="w-3 h-3" /></button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="p-2 md:p-3"><ToggleSwitch enabled={rule.enabled} onChange={isReadOnly ? () => {} : () => onToggleRule(rule.id)} /></td>
+                                        <td className="p-2 md:p-3 font-mono text-xs md:text-sm"><span className={rule.action === 'Allow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>{rule.action}</span></td>
+                                        <td className="p-2 md:p-3 text-gray-600 dark:text-gray-300 hidden md:table-cell text-xs">{rule.protocol}</td>
+                                        <td className="p-2 md:p-3 text-gray-800 dark:text-gray-200 font-mono text-xs break-all">{rule.source}</td>
+                                        <td className="p-2 md:p-3 text-gray-600 dark:text-gray-300 font-mono text-xs hidden sm:table-cell break-all">{rule.destination}</td>
+                                        <td className="p-2 md:p-3 text-gray-600 dark:text-gray-300 hidden md:table-cell text-xs">{rule.port}</td>
+                                        <td className="p-2 md:p-3 text-yellow-600 dark:text-yellow-300 font-mono text-xs md:text-sm">{rule.hits.toLocaleString()}</td>
+                                        {!isReadOnly && (
+                                            <td className="p-2 md:p-3">
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => openForm(rule)} className="p-1 text-blue-500 dark:text-blue-400 hover:bg-blue-500/20 rounded-full transition-colors"><Icon name="edit" className="w-4 h-4"/></button>
+                                                    <button onClick={() => handleDeleteClick(rule)} className="p-1 text-red-500 dark:text-red-400 hover:bg-red-500/20 rounded-full transition-colors"><Icon name="trash" className="w-4 h-4"/></button>
+                                                </div>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </GlassPanel>
+                </>
+            )}
+
+            {activeTab === 'addressReservation' && (
+                <AclFeaturePanel 
+                    title="IP Address Reservation" 
+                    description="Reserve fixed IP addresses for specific devices"
+                    items={aclFeatures.addressReservations} 
+                    columns={['mac', 'ipAddress', 'device']}
+                    columnLabels={{ mac: 'MAC Address', ipAddress: 'Reserved IP', device: 'Device Name' }}
+                    isReadOnly={isReadOnly}
+                    featureType="addressReservation"
+                    onUpdate={handleAclUpdate}
+                />
+            )}
+
+            {activeTab === 'blacklist' && (
+                <AclFeaturePanel 
+                    title="Blacklist" 
+                    description="Block specific IP addresses or MAC addresses from accessing the network"
+                    items={aclFeatures.blacklist} 
+                    columns={['entry', 'type', 'reason']}
+                    columnLabels={{ entry: 'IP/MAC', type: 'Type', reason: 'Reason' }}
+                    isReadOnly={isReadOnly}
+                    featureType="blacklist"
+                    onUpdate={handleAclUpdate}
+                />
+            )}
+
+            {activeTab === 'whitelist' && (
+                <AclFeaturePanel 
+                    title="Whitelist" 
+                    description="Allow only specific devices to access the network"
+                    items={aclFeatures.whitelist} 
+                    columns={['entry', 'type', 'device']}
+                    columnLabels={{ entry: 'IP/MAC', type: 'Type', device: 'Device Name' }}
+                    isReadOnly={isReadOnly}
+                    featureType="whitelist"
+                    onUpdate={handleAclUpdate}
+                />
+            )}
+
+            {activeTab === 'parentalControl' && (
+                <AclFeaturePanel 
+                    title="Parental Control" 
+                    description="Control access to websites and manage usage time for specific devices"
+                    items={aclFeatures.parentalControls} 
+                    columns={['device', 'blockedCategories', 'timeLimit']}
+                    columnLabels={{ device: 'Device', blockedCategories: 'Blocked Categories', timeLimit: 'Daily Time Limit' }}
+                    isReadOnly={isReadOnly}
+                    featureType="parentalControl"
+                    onUpdate={handleAclUpdate}
+                />
+            )}
+
+            {activeTab === 'qos' && (
+                <AclFeaturePanel 
+                    title="Quality of Service (QoS)" 
+                    description="Prioritize network traffic and manage bandwidth allocation"
+                    items={aclFeatures.qosRules} 
+                    columns={['device', 'priority', 'bandwidth', 'protocol']}
+                    columnLabels={{ device: 'Device/Service', priority: 'Priority', bandwidth: 'Bandwidth', protocol: 'Protocol' }}
+                    isReadOnly={isReadOnly}
+                    featureType="qos"
+                    onUpdate={handleAclUpdate}
+                />
+            )}
+        </div>
+    );
+};
+
+const AclFeaturePanel = ({ title, description, items, columns, columnLabels, isReadOnly, featureType, onUpdate }) => {
+    const [showForm, setShowForm] = useState(false);
+    const [editingItem, setEditingItem] = useState(null);
+    const [formData, setFormData] = useState({});
+    const [itemToDelete, setItemToDelete] = useState(null);
+
+    const openForm = (item = null) => {
+        if (item) {
+            setEditingItem(item);
+            setFormData({ ...item });
+        } else {
+            setEditingItem(null);
+            setFormData({});
+        }
+        setShowForm(true);
+    };
+
+    const closeForm = () => {
+        setShowForm(false);
+        setEditingItem(null);
+        setFormData({});
+    };
+
+    const handleSave = () => {
+        if (!formData.id) formData.id = Date.now();
+        onUpdate(featureType, editingItem ? 'edit' : 'add', formData);
+        closeForm();
+    };
+
+    const handleDelete = (item) => {
+        onUpdate(featureType, 'delete', item);
+        setItemToDelete(null);
+    };
+
+    const renderFormFields = () => {
+        switch (featureType) {
+            case 'addressReservation':
+                return (
+                    <>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">MAC Address</label>
+                            <input
+                                type="text"
+                                placeholder="00:1A:2B:3C:4D:5E"
+                                value={formData.mac || ''}
+                                onChange={(e) => setFormData({ ...formData, mac: e.target.value })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Reserved IP Address</label>
+                            <input
+                                type="text"
+                                placeholder="192.168.1.100"
+                                value={formData.ipAddress || ''}
+                                onChange={(e) => setFormData({ ...formData, ipAddress: e.target.value })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Device Name</label>
+                            <input
+                                type="text"
+                                placeholder="e.g., Printer, NAS Storage"
+                                value={formData.device || ''}
+                                onChange={(e) => setFormData({ ...formData, device: e.target.value })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                            />
+                        </div>
+                    </>
+                );
+            case 'blacklist':
+            case 'whitelist':
+                return (
+                    <>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{featureType === 'blacklist' ? 'IP/MAC to Block' : 'IP/MAC to Allow'}</label>
+                            <input
+                                type="text"
+                                placeholder="192.168.1.50 or 00:11:22:33:44:55"
+                                value={formData.entry || ''}
+                                onChange={(e) => setFormData({ ...formData, entry: e.target.value })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Type</label>
+                            <select
+                                value={formData.type || 'IP'}
+                                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                            >
+                                <option>IP</option>
+                                <option>MAC</option>
+                            </select>
+                        </div>
+                        {featureType === 'blacklist' ? (
+                            <div className="mb-4">
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Reason</label>
+                                <input
+                                    type="text"
+                                    placeholder="Reason for blocking"
+                                    value={formData.reason || ''}
+                                    onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                                    className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                                />
+                            </div>
+                        ) : (
+                            <div className="mb-4">
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Device Name</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g., Work PC"
+                                    value={formData.device || ''}
+                                    onChange={(e) => setFormData({ ...formData, device: e.target.value })}
+                                    className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                                />
+                            </div>
+                        )}
+                    </>
+                );
+            case 'parentalControl':
+                return (
+                    <>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Device Name</label>
+                            <input
+                                type="text"
+                                placeholder="e.g., Kid-Tablet"
+                                value={formData.device || ''}
+                                onChange={(e) => setFormData({ ...formData, device: e.target.value })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Blocked Categories (comma-separated)</label>
+                            <input
+                                type="text"
+                                placeholder="Adult, Gaming, Social Media"
+                                value={Array.isArray(formData.blockedCategories) ? formData.blockedCategories.join(', ') : ''}
+                                onChange={(e) => setFormData({ ...formData, blockedCategories: e.target.value.split(',').map(c => c.trim()) })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Daily Time Limit</label>
+                            <input
+                                type="text"
+                                placeholder="e.g., 2 hours or Unlimited"
+                                value={formData.timeLimit || ''}
+                                onChange={(e) => setFormData({ ...formData, timeLimit: e.target.value })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                            />
+                        </div>
+                    </>
+                );
+            case 'qos':
+                return (
+                    <>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Device/Service Name</label>
+                            <input
+                                type="text"
+                                placeholder="e.g., Gaming PC, Video Streaming"
+                                value={formData.device || ''}
+                                onChange={(e) => setFormData({ ...formData, device: e.target.value })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                            />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Priority</label>
+                            <select
+                                value={formData.priority || 'Medium'}
+                                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                            >
+                                <option>High</option>
+                                <option>Medium</option>
+                                <option>Low</option>
+                            </select>
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Bandwidth Limit</label>
+                            <select
+                                value={formData.bandwidth || 'No Limit'}
+                                onChange={(e) => setFormData({ ...formData, bandwidth: e.target.value })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                            >
+                                <option>No Limit</option>
+                                <option>10 Mbps</option>
+                                <option>25 Mbps</option>
+                                <option>50 Mbps</option>
+                                <option>100 Mbps</option>
+                                <option>250 Mbps</option>
+                                <option>500 Mbps</option>
+                                <option>1 Gbps</option>
+                                <option>2.5 Gbps</option>
+                                <option>5 Gbps</option>
+                                <option>10 Gbps</option>
+                            </select>
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Protocol</label>
+                            <select
+                                value={formData.protocol || 'All'}
+                                onChange={(e) => setFormData({ ...formData, protocol: e.target.value })}
+                                className="w-full px-3 py-2 bg-gray-700 border border-cyan-500/30 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                            >
+                                <option>All</option>
+                                <option>TCP</option>
+                                <option>UDP</option>
+                                <option>ICMP</option>
+                            </select>
+                        </div>
+                    </>
+                );
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <>
+            <GlassPanel className="p-4">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">{title}</h3>
+                        <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
+                    </div>
+                    {!isReadOnly && (
+                        <button onClick={() => openForm()} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:opacity-90 transition-opacity text-sm whitespace-nowrap">
+                            <Icon name="plus" className="w-4 h-4" />
+                            Add
+                        </button>
+                    )}
+                </div>
+            </GlassPanel>
+
+            {showForm && (
+                <GlassPanel className="p-4 border-2 border-cyan-500/50">
+                    <div className="flex justify-between items-center mb-4">
+                        <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">{editingItem ? 'Edit' : 'Add New'}</h4>
+                        <button onClick={closeForm} className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                            <Icon name="x" className="w-5 h-5" />
+                        </button>
+                    </div>
+                    {renderFormFields()}
+                    <div className="flex gap-2 justify-end">
+                        <button
+                            onClick={closeForm}
+                            className="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-700 text-white transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90 text-white font-semibold transition-opacity"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </GlassPanel>
+            )}
+
+            {itemToDelete && (
                 <ConfirmationModal
-                    title="Delete ACL Rule"
-                    message={`Are you sure you want to delete this rule? (Source: ${ruleToDelete.source}, Action: ${ruleToDelete.action})`}
-                    onConfirm={confirmDelete}
-                    onCancel={() => setRuleToDelete(null)}
+                    title="Delete Entry"
+                    message={`Are you sure you want to delete this entry?`}
+                    onConfirm={() => handleDelete(itemToDelete)}
+                    onCancel={() => setItemToDelete(null)}
                     confirmText="Delete"
                     confirmColor="red"
                 />
             )}
 
             <GlassPanel className="p-4 overflow-x-auto">
-                <table className="w-full text-left table-auto">
+                <table className="w-full text-left table-auto text-xs md:text-sm">
                     <thead>
                         <tr className="border-b border-cyan-500/20 dark:border-cyan-300/20">
-                            <th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300 w-24">Order</th>
-                            <th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                            <th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Action</th>
-                            <th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">Protocol</th>
-                            <th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Source</th>
-                            <th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hidden sm:table-cell">Destination</th>
-                            <th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">Port</th>
-                            <th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Hits</th>
-                            {!isReadOnly && <th className="p-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Actions</th>}
+                            <th className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300">Status</th>
+                            {columns.map(col => (
+                                <th key={col} className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300">{columnLabels[col]}</th>
+                            ))}
+                            {!isReadOnly && <th className="p-2 md:p-3 font-semibold text-gray-700 dark:text-gray-300">Actions</th>}
                         </tr>
                     </thead>
                     <tbody>
-                        {rules.map((rule, index) => (
-                            <tr key={rule.id} className="border-b border-cyan-500/10 dark:border-cyan-300/10 hover:bg-cyan-500/10 group">
-                                <td className="p-3">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-mono text-cyan-600 dark:text-cyan-300">{index + 1}</span>
-                                        {!isReadOnly && (
-                                            <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => onReorderRule(index, 'up')} disabled={index === 0} className="disabled:opacity-20"><Icon name="arrowUp" className="w-4 h-4" /></button>
-                                                <button onClick={() => onReorderRule(index, 'down')} disabled={index === rules.length - 1} className="disabled:opacity-20"><Icon name="arrowDown" className="w-4 h-4" /></button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="p-3"><ToggleSwitch enabled={rule.enabled} onChange={isReadOnly ? () => {} : () => onToggleRule(rule.id)} /></td>
-                                <td className="p-3 font-mono text-sm"><span className={rule.action === 'Allow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>{rule.action}</span></td>
-                                <td className="p-3 text-gray-600 dark:text-gray-300 hidden md:table-cell">{rule.protocol}</td>
-                                <td className="p-3 text-gray-800 dark:text-gray-200 font-mono text-xs break-all">{rule.source}</td>
-                                <td className="p-3 text-gray-600 dark:text-gray-300 font-mono text-xs hidden sm:table-cell break-all">{rule.destination}</td>
-                                <td className="p-3 text-gray-600 dark:text-gray-300 hidden md:table-cell">{rule.port}</td>
-                                <td className="p-3 text-yellow-600 dark:text-yellow-300 font-mono text-sm">{rule.hits.toLocaleString()}</td>
+                        {items.map((item) => (
+                            <tr key={item.id} className="border-b border-cyan-500/10 dark:border-cyan-300/10 hover:bg-cyan-500/10">
+                                <td className="p-2 md:p-3"><ToggleSwitch enabled={item.enabled} onChange={() => {}} /></td>
+                                {columns.map(col => (
+                                    <td key={col} className="p-2 md:p-3 text-gray-700 dark:text-gray-300 break-words">
+                                        {Array.isArray(item[col]) ? item[col].join(', ') : item[col]}
+                                    </td>
+                                ))}
                                 {!isReadOnly && (
-                                    <td className="p-3">
+                                    <td className="p-2 md:p-3">
                                         <div className="flex items-center gap-2">
-                                            <button onClick={() => openForm(rule)} className="p-2 text-blue-500 dark:text-blue-400 hover:bg-blue-500/20 rounded-full transition-colors"><Icon name="edit" className="w-5 h-5"/></button>
-                                            <button onClick={() => handleDeleteClick(rule)} className="p-2 text-red-500 dark:text-red-400 hover:bg-red-500/20 rounded-full transition-colors"><Icon name="trash" className="w-5 h-5"/></button>
+                                            <button onClick={() => openForm(item)} className="p-1 text-blue-500 dark:text-blue-400 hover:bg-blue-500/20 rounded transition-colors"><Icon name="edit" className="w-4 h-4"/></button>
+                                            <button onClick={() => setItemToDelete(item)} className="p-1 text-red-500 dark:text-red-400 hover:bg-red-500/20 rounded transition-colors"><Icon name="trash" className="w-4 h-4"/></button>
                                         </div>
                                     </td>
                                 )}
@@ -1437,7 +2218,7 @@ const AclView = ({ rules, onAddRule, onEditRule, onDeleteRule, onToggleRule, onR
                     </tbody>
                 </table>
             </GlassPanel>
-        </div>
+        </>
     );
 };
 const SpeedTestModal = ({ onClose }) => {
@@ -1846,13 +2627,17 @@ const UserAccessControl = () => {
                             <tr key={user.id} className="border-b border-cyan-500/10 dark:border-cyan-300/10 hover:bg-cyan-500/5">
                                 {editingUser?.id === user.id ? (
                                     <>
-                                        <td className="p-3"><input value={editingUser.username} onChange={(e) => setEditingUser({...editingUser, username: e.target.value})} className="p-1 bg-white dark:bg-black/30 border border-cyan-500/20 rounded text-gray-900 dark:text-white"/></td>
-                                        <td className="p-3"><input value={editingUser.email} onChange={(e) => setEditingUser({...editingUser, email: e.target.value})} className="p-1 bg-white dark:bg-black/30 border border-cyan-500/20 rounded text-gray-900 dark:text-white"/></td>
+                                        <td className="p-3"><input value={editingUser.username} onChange={(e) => setEditingUser({...editingUser, username: e.target.value})} className="p-1 bg-white dark:bg-black/30 border border-cyan-500/20 rounded text-gray-900 dark:text-white" disabled={user.id === 1}/></td>
+                                        <td className="p-3"><input value={editingUser.email} onChange={(e) => setEditingUser({...editingUser, email: e.target.value})} className="p-1 bg-white dark:bg-black/30 border border-cyan-500/20 rounded text-gray-900 dark:text-white" disabled={user.id === 1}/></td>
                                         <td className="p-3">
-                                            <select value={editingUser.role} onChange={(e) => setEditingUser({...editingUser, role: e.target.value})} className="p-1 bg-white dark:bg-black/30 border border-cyan-500/20 rounded text-gray-900 dark:text-white">
-                                                <option value="viewer">Viewer</option>
-                                                <option value="admin">Admin</option>
-                                            </select>
+                                            {user.id === 1 ? (
+                                                <span className="px-2 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-400">Admin (Locked)</span>
+                                            ) : (
+                                                <select value={editingUser.role} onChange={(e) => setEditingUser({...editingUser, role: e.target.value})} className="p-1 bg-white dark:bg-black/30 border border-cyan-500/20 rounded text-gray-900 dark:text-white">
+                                                    <option value="viewer">Viewer</option>
+                                                    <option value="admin">Admin</option>
+                                                </select>
+                                            )}
                                         </td>
                                         <td className="p-3"><span className="capitalize text-gray-700 dark:text-gray-300">{user.status}</span></td>
                                         <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never'}</td>
@@ -1872,9 +2657,15 @@ const UserAccessControl = () => {
                                         <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never'}</td>
                                         <td className="p-3">
                                             <div className="flex gap-2">
-                                                <button onClick={() => handleEditUser(user)} className="p-1 hover:bg-cyan-500/20 rounded"><Icon name="edit" className="w-4 h-4 text-cyan-500"/></button>
-                                                <button onClick={() => toggleUserStatus(user.id)} className="p-1 hover:bg-yellow-500/20 rounded"><Icon name={user.status === 'active' ? 'lock' : 'unlock'} className="w-4 h-4 text-yellow-500"/></button>
-                                                {user.id !== 1 && <button onClick={() => handleDeleteUser(user.id)} className="p-1 hover:bg-red-500/20 rounded"><Icon name="trash" className="w-4 h-4 text-red-500"/></button>}
+                                                {user.id === 1 ? (
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400 italic">Protected</span>
+                                                ) : (
+                                                    <>
+                                                        <button onClick={() => handleEditUser(user)} className="p-1 hover:bg-cyan-500/20 rounded"><Icon name="edit" className="w-4 h-4 text-cyan-500"/></button>
+                                                        <button onClick={() => toggleUserStatus(user.id)} className="p-1 hover:bg-yellow-500/20 rounded"><Icon name={user.status === 'active' ? 'lock' : 'unlock'} className="w-4 h-4 text-yellow-500"/></button>
+                                                        <button onClick={() => handleDeleteUser(user.id)} className="p-1 hover:bg-red-500/20 rounded"><Icon name="trash" className="w-4 h-4 text-red-500"/></button>
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
                                     </>
@@ -4293,9 +5084,16 @@ function App() {
     const [showUserProfileModal, setShowUserProfileModal] = useState(false);
     const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
     const [showSpeedTestModal, setShowSpeedTestModal] = useState(false);
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+    const [showWelcomeModal, setShowWelcomeModal] = useState(() => !localStorage.getItem('nms_visited'));
     const [rebootingDevice, setRebootingDevice] = useState(null);
     const [updatingFirmwareDevice, setUpdatingFirmwareDevice] = useState(null);
     const [activeView, setActiveView] = useState('dashboard');
+    
+    // Brute force protection
+    const [loginAttempts, setLoginAttempts] = useState(0);
+    const [isLoginLocked, setIsLoginLocked] = useState(false);
+    const [lockTimeRemaining, setLockTimeRemaining] = useState(0);
     
     const [devices, setDevices] = useState(initialDevices);
     const [bandwidthHistory, setBandwidthHistory] = useState(initialBandwidthData);
@@ -4351,13 +5149,13 @@ function App() {
         latencyBase: 22,
     });
     
-    const navItems = [
+    const navItems = useMemo(() => [
         { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' }, { id: 'switches', icon: 'switch', label: 'Switches' },
         { id: 'routers', icon: 'router', label: 'Routers' }, { id: 'servers', icon: 'server', label: 'Servers' },
         { id: 'wireless', icon: 'wifi', label: 'Wireless' }, { id: 'dns', icon: 'dns', label: 'DNS' },
         { id: 'acl', icon: 'shield', label: 'ACL' }, { id: 'health', icon: 'activity', label: 'Network Health' },
         { id: 'settings', icon: 'settings', label: 'Settings' },
-    ];
+    ], []);
     
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -4455,7 +5253,36 @@ function App() {
         }));
     }, [devices, alerts, isAuthenticated]);
     
+    // Mark as visited when welcome modal is closed
+    useEffect(() => {
+        if (!showWelcomeModal) {
+            localStorage.setItem('nms_visited', 'true');
+        }
+    }, [showWelcomeModal]);
+
+    // Brute force protection timer
+    useEffect(() => {
+        if (isLoginLocked && lockTimeRemaining > 0) {
+            const timer = setInterval(() => {
+                setLockTimeRemaining(prev => {
+                    if (prev <= 1) {
+                        setIsLoginLocked(false);
+                        setLoginAttempts(0);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+            return () => clearInterval(timer);
+        }
+    }, [isLoginLocked, lockTimeRemaining]);
+
     const handleLogin = async (username, password) => {
+        // Check if locked
+        if (isLoginLocked) {
+            return { success: false, attempts: loginAttempts };
+        }
+        
         // Check MFA requirement - User Scoped
         // Use default false if not set
         const mfaEnabled = localStorage.getItem(`mfaEnabled_${username}`) === 'true';
@@ -4477,13 +5304,17 @@ function App() {
             const defaultHash = await hashSHA256('admin');
             const expectedHash = storedHash || defaultHash;
             if (enteredHash === expectedHash && user) {
+                // Reset attempts on successful login
+                setLoginAttempts(0);
+                setIsLoginLocked(false);
+                
                 // If MFA enabled, wait for verification
                 if (mfaEnabled) {
                     setTempMfaUser(user);
                     setTempMfaRole(user.role);
                     setWaitingForMfa(true);
                     logAudit('mfa_required', { user: 'admin' });
-                    return true; // Indicate credentials were valid, now waiting for MFA
+                    return { success: true, attempts: 0 }; // Indicate credentials were valid, now waiting for MFA
                 }
                 // MFA disabled, authenticate immediately
                 setIsAuthenticated(true);
@@ -4495,7 +5326,7 @@ function App() {
                     u.id === user.id ? { ...u, lastLogin: new Date().toISOString() } : u
                 );
                 localStorage.setItem('systemUsers', JSON.stringify(updatedUsers));
-                return true;
+                return { success: true, attempts: 0 };
             }
         } else if (user && password === 'viewer') { // Simple password for demo
             // If MFA enabled, wait for verification
@@ -4504,7 +5335,7 @@ function App() {
                 setTempMfaRole(user.role);
                 setWaitingForMfa(true);
                 logAudit('mfa_required', { user: 'viewer' });
-                return true;
+                return { success: true, attempts: 0 };
             }
             // MFA disabled, authenticate immediately
             setIsAuthenticated(true);
@@ -4516,9 +5347,9 @@ function App() {
                 u.id === user.id ? { ...u, lastLogin: new Date().toISOString() } : u
             );
             localStorage.setItem('systemUsers', JSON.stringify(updatedUsers));
-            return true;
+            return { success: true, attempts: 0 };
         }
-        return false;
+        return { success: false, attempts: loginAttempts };
     };
 
     const handleMfaVerify = async (code) => {
@@ -4672,7 +5503,7 @@ function App() {
 
     const renderView = () => {
         switch(activeView) {
-            case 'dashboard': return <DashboardView stats={stats} bandwidthHistory={bandwidthHistory} devices={devices} loading={dataLoading} />;
+            case 'dashboard': return <DashboardView stats={stats} bandwidthHistory={bandwidthHistory} devices={devices} loading={dataLoading} onShowAlerts={() => setShowAlertsPanel(true)} />;
             case 'switches': 
                 return <SwitchesView 
                     switches={devices.filter(d => d.type.toLowerCase() === 'switch')}
@@ -4729,6 +5560,7 @@ function App() {
                 
                 {!isAuthenticated ? (
                     <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+                        {showWelcomeModal && <WelcomeModal onClose={() => setShowWelcomeModal(false)} />}
                         {waitingForMfa ? (
                             <MFAVerificationPanel 
                                 onVerify={handleMfaVerify} 
@@ -4736,25 +5568,29 @@ function App() {
                                 onReset={handleMfaReset}
                             />
                         ) : (
-                            <LoginPanel onLogin={handleLogin} />
+                            <LoginPanel onLogin={handleLogin} isLocked={isLoginLocked} lockTimeRemaining={lockTimeRemaining} onToggleTheme={handleThemeChange} isDarkMode={settings.theme === 'dark'} />
                         )}
                     </div>
                 ) : (
                     <div className="relative z-10 flex min-h-screen">
                         <Sidebar navItems={navItems} activeView={activeView} setActiveView={setActiveView} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
                         <main className="flex-1 transition-all duration-300 md:ml-64">
-                            <div className="w-full max-w-7xl mx-auto p-4">
-                                <div className="space-y-6">
+                            <div className="w-full max-w-7xl mx-auto px-2 sm:px-3 md:px-4 py-2 md:py-4">
+                                <div className="space-y-4 md:space-y-6">
                                     <Header 
                                         activeViewLabel={activeNavItem.label} 
                                         alertsCount={alerts.length} 
+                                        criticalAlertsCount={stats.criticalAlerts}
                                         onLogout={handleLogout} 
                                         onShowAlerts={() => setShowAlertsPanel(!showAlertsPanel)} 
                                         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
                                         onToggleProfile={() => setShowProfileDropdown(!showProfileDropdown)}
+                                        onShowFeedback={() => setShowFeedbackModal(true)}
                                         currentTime={currentTime}
                                         timezone={settings.timezone}
                                         userRole={userRole}
+                                        onToggleTheme={handleThemeChange}
+                                        isDarkMode={settings.theme === 'dark'}
                                     />
                                     {showAlertsPanel && <AlertsPanel alerts={alerts} onClose={() => setShowAlertsPanel(false)} />}
                                     {showProfileDropdown && (
@@ -4763,6 +5599,7 @@ function App() {
                                             onShowProfile={() => { setShowProfileDropdown(false); setShowUserProfileModal(true); }} 
                                             onShowChangePassword={() => { setShowProfileDropdown(false); setShowChangePasswordModal(true); }}
                                             onShowMfaSettings={() => { setShowProfileDropdown(false); setStartMfaSetup(true); setShowUserProfileModal(true); }}
+                                            onClose={() => setShowProfileDropdown(false)}
                                         />
                                     )}
                                     {showUserProfileModal && (
@@ -4774,9 +5611,24 @@ function App() {
                                     )}
                                     {showChangePasswordModal && <ChangePasswordModal onClose={() => setShowChangePasswordModal(false)} />}
                                     {showSpeedTestModal && <SpeedTestModal onClose={() => setShowSpeedTestModal(false)} />}
+                                    {showFeedbackModal && <FeedbackModal onClose={() => setShowFeedbackModal(false)} />}
                                     {rebootingDevice && <RebootModal deviceName={rebootingDevice} onClose={handleCloseRebootModal} />}
                                     {updatingFirmwareDevice && <FirmwareUpdateModal deviceName={updatingFirmwareDevice} onClose={handleCloseRebootModal} />}
                                     {renderView()}
+                                    {activeView === 'dashboard' && (
+                                        <div className="mt-8 pt-6 border-t border-cyan-500/20 text-center space-y-2">
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                Made with <span className="text-red-500">❤️</span> by <span className="font-semibold text-cyan-600 dark:text-cyan-400">Aditya Raj</span>
+                                            </p>
+                                            <button 
+                                                onClick={() => setShowFeedbackModal(true)}
+                                                className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline inline-flex items-center gap-1"
+                                            >
+                                                <Icon name="help" className="w-3 h-3" />
+                                                Report Issue / Feedback
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </main>

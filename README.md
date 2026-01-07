@@ -1,16 +1,241 @@
-# React + Vite
+# NMS Dashboard - Network Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A comprehensive, modern web-based **Network Management System (NMS)** dashboard with advanced security features, real-time monitoring, and firewall simulation capabilities.
 
-Currently, two official plugins are available:
+## 🌟 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 🔐 **Security & Authentication**
+- **Multi-Factor Authentication (MFA)** with TOTP (Time-based One-Time Password)
+- **HMAC-SHA1 based 2FA** with ±60 second time drift tolerance
+- **User-scoped MFA storage** (separate for admin and viewer roles)
+- **Brute force protection**: 4-attempt limit with 15-minute lockout
+- **Inspect/Tampering Prevention**: Right-click disabled, DevTools blocked, detection enabled
+- **Anti-embedding security**: X-Frame-Options and CSP headers
+- **Password strength meter** with 5-level validation
+- **Secure password reset utility** via console
+- **Admin user locking** to prevent race conditions
 
-## React Compiler
+### 📊 **Dashboard & Monitoring**
+- Real-time statistics dashboard with device counts and alerts
+- **Network Topology Map** with SVG visualization, animated packets, and device status
+- Hover tooltips showing device mapping
+- Real-time device synchronization
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 🖥️ **Device Management**
+- Switch Management (ports, VLANs, statistics)
+- Router Management (BGP, routing tables)
+- Server Management (services, performance metrics)
+- Firewall Rule Management
+- Wireless AP Monitoring
+- DNS Record Management
 
-## Expanding the ESLint configuration
+### 🛡️ **Advanced Access Control (ACL)**
+- **Access Rules** - Firewall rules with hit counters
+- **Address Reservation** - DHCP IP reservation
+- **Blacklist** - Block IP/MAC addresses
+- **Whitelist** - Allow-list devices
+- **Parental Control** - Website blocking & time limits
+- **QoS** - Bandwidth prioritization with preset options
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 🎨 **User Interface**
+- Dark/Light theme toggle (moon icon in navbar & login)
+- Responsive design (xs/sm/md/lg/xl breakpoints)
+- Glass-morphism design with cyan/blue accents
+- Welcome modal for first-time users
+- Real-time clock with timezone support
+- Mobile-optimized layout
+
+### 📈 **Analytics & Health**
+- Network Health View with yearly bandwidth trends
+- Speed test capability
+- Performance graphs using Recharts
+- Historical data tracking
+
+### 👥 **Role-Based Access Control**
+- Admin: Full access
+- Viewer: Read-only mode with "READ-ONLY" badge
+
+## 🛠️ **Tech Stack**
+
+| Technology | Version | Purpose |
+|-----------|---------|---------|
+| React | 19.1.1 | UI Framework |
+| Vite | 7.3.0 | Build & Dev Server |
+| Tailwind CSS | 3.4.17 | Styling |
+| Recharts | 3.6.0 | Data Visualization |
+| Web Crypto API | Native | TOTP & Security |
+
+## 📦 **Installation**
+
+### Prerequisites
+- Node.js v16+
+- npm or yarn
+
+### Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+Development: http://localhost:5173
+Production: `dist/` directory
+
+## 🔑 **Default Credentials**
+
+> ⚠️ Change immediately after first login!
+
+- **Username**: admin
+- **Password**: admin
+- **MFA**: Generated on first login
+
+## 🚀 **Usage**
+
+### Login Flow
+1. Enter credentials (admin/admin)
+2. Complete MFA verification
+3. Access dashboard
+
+### Navigation
+- **Sidebar**: Switch views
+- **Header**: Access alerts, feedback, profile, theme
+- **Mobile**: Hamburger menu for sidebar
+
+### Managing Devices
+- Dashboard: Statistics & topology
+- Switches: Ports, VLANs, statistics
+- Routers: BGP neighbors, routing
+- Servers: Services, performance
+- Wireless: APs, connected devices
+- Firewalls: Rules & policies
+- DNS: Records management
+
+### ACL Management
+1. Go to **Access Control & Network Management**
+2. Select feature tab
+3. **Add**: Create new entry
+4. **Edit**: Modify entry
+5. **Delete**: Remove entry
+6. **Toggle**: Enable/disable
+
+### Password Management
+- **Change**: Profile → Change Password
+- **Reset** (console):
+  ```javascript
+  resetAdminPassword('newPassword123')
+  ```
+
+## 🎯 **Key Features**
+
+### TOTP Authentication
+- 6-digit codes (30-second refresh)
+- ±60 second time drift tolerance
+- User-scoped secrets
+- HMAC-SHA1 implementation
+
+### Network Topology
+- 8 network nodes
+- Status colors: 🟢 Online, 🟡 Warning, 🔴 Offline
+- Device mapping on hover
+- Real-time sync
+
+### Security Headers
+- X-Frame-Options: Allow only `https://adityaraj3136.github.io/`
+- Content-Security-Policy: Restrict frame ancestors
+- Protection against unauthorized embedding
+
+## 📱 **Responsive Design**
+
+| Breakpoint | Width | Device |
+|-----------|-------|--------|
+| xs | 0px | Mobile |
+| sm | 640px | Tablet |
+| md | 768px | Tablet+ |
+| lg | 1024px | Desktop |
+| xl | 1280px | Large Desktop |
+
+## 🔒 **Security**
+
+### Best Practices
+1. Change default credentials immediately
+2. Enable MFA for all accounts
+3. Use HTTPS in production
+4. Backup configuration regularly
+5. Monitor failed login attempts
+6. Update passwords periodically
+
+### Features
+- ✅ Right-click prevention
+- ✅ DevTools blocking
+- ✅ Window size detection
+- ✅ Secure localStorage
+- ✅ User-scoped data isolation
+
+## 🎨 **Theme System**
+
+- **Dark Mode** (default): Low-light environments
+- **Light Mode**: Bright environments
+- Toggle via moon icon in navbar or login
+- Persisted in localStorage
+
+## 📊 **Data Storage**
+
+Client-side localStorage stores:
+- User credentials & sessions
+- MFA secrets
+- Theme preference
+- Audit logs
+- ACL rules
+
+> Integrate with backend database for production
+
+## 🐛 **Troubleshooting**
+
+### MFA Issues
+- Clear cache & localStorage
+- Sync system time
+- Verify TOTP secret saved
+
+### DevTools Blocked
+- Intentional security feature
+- Use `resetAdminPassword()` in console
+- Contact admin for access
+
+### Theme Not Saving
+- Enable localStorage
+- Avoid clearing on exit
+- Test in normal (non-private) mode
+
+## 📝 **Audit Logs**
+
+Events logged:
+- Login attempts
+- MFA verification
+- Password resets
+- ACL modifications
+- Device changes
+- Settings updates
+
+## 🤝 **Support**
+
+- **Feedback**: https://adityaraj3136.github.io/contact/
+- **GitHub**: @aditya-raj
+- **Email**: adityaraj3136@gmail.com
+
+## 📄 **License**
+
+Created by **Aditya Raj** for network management simulation.
+
+## ✨ **Made with ❤️**
+
+Built with modern web technologies and security best practices.
+
+---
+
+**Version**: 1.0.0 | **Updated**: January 7, 2026
