@@ -467,6 +467,11 @@ const LoginPanel = ({ onLogin, isLocked, lockTimeRemaining, onToggleTheme, isDar
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
+    const [resetPassword, setResetPassword] = useState('');
+    const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+    const [resetError, setResetError] = useState('');
+    const [resetSuccess, setResetSuccess] = useState('');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -489,14 +494,50 @@ const LoginPanel = ({ onLogin, isLocked, lockTimeRemaining, onToggleTheme, isDar
         }
     };
 
-    const handleForgot = () => {
+    const handleResetPasswordSubmit = (e) => {
+        e.preventDefault();
+        setResetError('');
+        setResetSuccess('');
+
+        if (!resetPassword || resetPassword.length < 6) {
+            setResetError('Password must be at least 6 characters long');
+            return;
+        }
+
+        if (resetPassword !== resetConfirmPassword) {
+            setResetError('Passwords do not match');
+            return;
+        }
+
         try {
-            const users = JSON.parse(localStorage.getItem('systemUsers') || '[]');
-            const admin = users.find(u => u.username === 'admin');
-            const email = 'adityaraj3136@gmail.com';
-            logAudit('password_reset_requested', { user: username || 'unknown', target: 'admin' });
-            window.location.href = `mailto:${email}?subject=${encodeURIComponent('NMS Password Reset')}&body=${encodeURIComponent('A password reset was requested. If this was you, please reply to confirm.')}`;
-        } catch {}
+            const systemUsers = JSON.parse(localStorage.getItem('systemUsers') || '[]');
+            const adminIndex = systemUsers.findIndex(u => u.username === 'admin');
+
+            if (adminIndex === -1) {
+                setResetError('Admin user not found');
+                return;
+            }
+
+            systemUsers[adminIndex].password = resetPassword;
+            systemUsers[adminIndex].lastLogin = new Date().toISOString();
+            localStorage.setItem('systemUsers', JSON.stringify(systemUsers));
+
+            setResetSuccess('✅ Admin password reset successfully! Please reload and login with new credentials.');
+            setResetPassword('');
+            setResetConfirmPassword('');
+
+            setTimeout(() => {
+                setShowPasswordResetModal(false);
+                setResetSuccess('');
+            }, 3000);
+        } catch (error) {
+            setResetError('Error resetting password: ' + error.message);
+        }
+    };
+
+
+    const handleForgot = () => {
+        setShowPasswordResetModal(true);
     };
 
     return (
@@ -566,6 +607,63 @@ const LoginPanel = ({ onLogin, isLocked, lockTimeRemaining, onToggleTheme, isDar
                 </a>
             </div>
             </GlassPanel>
+
+            {/* Password Reset Modal */}
+            {showPasswordResetModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md" onClick={() => setShowPasswordResetModal(false)}>
+                    <GlassPanel className="w-full max-w-md p-4 sm:p-6 md:p-8 mx-auto" onClick={(e) => e.stopPropagation()}>
+                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-6 text-center">Reset Admin Password</h2>
+                        <form onSubmit={handleResetPasswordSubmit} className="space-y-4 sm:space-y-6">
+                            <div>
+                                <label className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">New Password</label>
+                                <input
+                                    type="password"
+                                    value={resetPassword}
+                                    onChange={(e) => setResetPassword(e.target.value)}
+                                    className="w-full p-2 sm:p-3 bg-gray-200/50 dark:bg-black/30 border border-cyan-500/20 dark:border-cyan-300/20 rounded-lg focus:outline-none transition text-sm sm:text-base"
+                                    placeholder="••••••••"
+                                    minLength="6"
+                                />
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Minimum 6 characters</p>
+                            </div>
+                            <div>
+                                <label className="text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Confirm Password</label>
+                                <input
+                                    type="password"
+                                    value={resetConfirmPassword}
+                                    onChange={(e) => setResetConfirmPassword(e.target.value)}
+                                    className="w-full p-2 sm:p-3 bg-gray-200/50 dark:bg-black/30 border border-cyan-500/20 dark:border-cyan-300/20 rounded-lg focus:outline-none transition text-sm sm:text-base"
+                                    placeholder="••••••••"
+                                    minLength="6"
+                                />
+                            </div>
+                            {resetError && <p className="text-red-500 text-xs sm:text-sm text-center">{resetError}</p>}
+                            {resetSuccess && <p className="text-green-500 text-xs sm:text-sm text-center">{resetSuccess}</p>}
+                            <div className="flex gap-2 sm:gap-3 pt-2 sm:pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowPasswordResetModal(false);
+                                        setResetPassword('');
+                                        setResetConfirmPassword('');
+                                        setResetError('');
+                                        setResetSuccess('');
+                                    }}
+                                    className="flex-1 p-2 sm:p-3 bg-gray-500/20 hover:bg-gray-500/30 text-gray-700 dark:text-gray-300 font-bold text-sm sm:text-base rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 p-2 sm:p-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-sm sm:text-base rounded-lg hover:opacity-90 transition-opacity"
+                                >
+                                    Reset Password
+                                </button>
+                            </div>
+                        </form>
+                    </GlassPanel>
+                </div>
+            )}
         </div>
     );
 };
