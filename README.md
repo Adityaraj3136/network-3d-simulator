@@ -2,6 +2,14 @@
 
 A comprehensive, modern web-based **Network Management System (NMS)** dashboard with advanced security features, real-time monitoring, and firewall simulation capabilities.
 
+## New in 1.1.0 (Jan 8, 2026)
+- Network Health view with ping tests, live OpenSpeedTest modal, and in-app CLI terminal for common network commands
+- Wireless scanner with sortable/filterable results and optional auto-scan range
+- Syslog viewer with severity/device/search filters plus real-time stream
+- Config backup/restore history with JSON export, firmware repository upload/download, and maintenance window scheduling
+- Device grouping/tags for bulk visibility and a richer user/role manager (add, edit, disable, protect admin)
+- Audit log viewer with one-click clear and in-app feedback/report issue entry point
+
 ## 🌟 Features
 
 ### 🔐 **Security & Authentication**
@@ -20,6 +28,7 @@ A comprehensive, modern web-based **Network Management System (NMS)** dashboard 
 - **Network Topology Map** with SVG visualization, animated packets, and device status
 - Hover tooltips showing device mapping
 - Real-time device synchronization
+- **Network Health Suite**: ping tests to 8.8.8.8, live speed test modal, and interactive CLI terminal
 
 ### 🖥️ **Device Management**
 - Switch Management (ports, VLANs, statistics)
@@ -28,6 +37,7 @@ A comprehensive, modern web-based **Network Management System (NMS)** dashboard 
 - Firewall Rule Management
 - Wireless AP Monitoring
 - DNS Record Management
+- Device groups/tags for organizing assets
 
 ### 🛡️ **Advanced Access Control (ACL)**
 - **Access Rules** - Firewall rules with hit counters
@@ -44,16 +54,19 @@ A comprehensive, modern web-based **Network Management System (NMS)** dashboard 
 - Welcome modal for first-time users
 - Real-time clock with timezone support
 - Mobile-optimized layout
+- Feedback modal for reporting issues from header or login
 
 ### 📈 **Analytics & Health**
 - Network Health View with yearly bandwidth trends
 - Speed test capability
 - Performance graphs using Recharts
 - Historical data tracking
+- Real-time syslog viewer with filters
 
 ### 👥 **Role-Based Access Control**
 - Admin: Full access
 - Viewer: Read-only mode with "READ-ONLY" badge
+- In-app user manager to add/edit/disable users (admin protected)
 
 ## 🛠️ **Tech Stack**
 
@@ -176,6 +189,7 @@ Production: `dist/` directory
 - ✅ Window size detection
 - ✅ Secure localStorage
 - ✅ User-scoped data isolation
+- ✅ Maintenance mode scheduling to prevent conflicts during changes
 
 ## 🎨 **Theme System**
 
@@ -194,6 +208,13 @@ Client-side localStorage stores:
 - ACL rules
 
 > Integrate with backend database for production
+
+## 🛠️ **Operations & Maintenance**
+- Configuration backup/restore history with JSON export per device
+- Firmware repository (upload/download/delete) with metadata
+- Maintenance window scheduler per device
+- Device grouping/tagging for bulk visibility
+- Network CLI terminal for quick checks
 
 ## 🐛 **Troubleshooting**
 
@@ -221,6 +242,7 @@ Events logged:
 - ACL modifications
 - Device changes
 - Settings updates
+- Syslog stream events (viewed in in-app syslog modal)
 
 ## 🤝 **Support**
 
@@ -238,4 +260,4 @@ Built with modern web technologies and security best practices.
 
 ---
 
-**Version**: 1.0.0 | **Updated**: January 7, 2026
+**Version**: 1.1.0 | **Updated**: January 8, 2026

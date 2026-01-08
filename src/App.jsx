@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Toaster, toast } from 'sonner';
 import { BarChart, LineChart, PieChart, Bar, Line, Pie, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 
 // --- Prevent Inspect/Tampering ---
@@ -128,18 +129,18 @@ const Icon = ({ name, className }) => {
 };
 
 const GlassPanel = ({ children, className = '', ...props }) => (
-  <div className={`bg-white/60 dark:bg-black/20 backdrop-blur-md border border-cyan-500/20 dark:border-cyan-300/20 rounded-2xl shadow-lg shadow-cyan-500/10 ${className}`} {...props}>
-    {children}
-  </div>
+    <div className={`bg-white dark:bg-black/20 backdrop-blur-md border border-cyan-500/10 dark:border-cyan-300/20 rounded-2xl shadow-md dark:shadow-lg ${className}`} {...props}>
+        {children}
+    </div>
 );
 
 const GlowingBorder = ({ children, className = '', ...props }) => (
-  <div className={`relative p-px rounded-2xl group transition-all duration-300 hover:shadow-cyan-500/30 hover:shadow-2xl ${className}`} {...props}>
-    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 opacity-30 group-hover:opacity-60 transition-opacity duration-300"></div>
-    <div className="relative bg-gray-200/80 dark:bg-gray-900/80 rounded-[15px] h-full">
-      {children}
+    <div className={`relative p-px rounded-2xl group transition-all duration-300 hover:shadow-cyan-500/20 hover:shadow-xl ${className}`} {...props}>
+        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 opacity-20 group-hover:opacity-40 transition-opacity duration-300"></div>
+        <div className="relative bg-white dark:bg-gray-900/80 rounded-[15px] h-full">
+            {children}
+        </div>
     </div>
-  </div>
 );
 
 const ToggleSwitch = ({ enabled, onChange }) => (
@@ -1802,6 +1803,169 @@ const DnsView = ({ records, onAddRecord, onDeleteRecord, userRole = 'admin' }) =
     );
 };
 
+    // --- Networking Tools View ---
+    const ToolsView = () => {
+        // Subnet Calculator state
+        const [ipInput, setIpInput] = useState('192.168.1.10');
+        const [cidrInput, setCidrInput] = useState('24');
+        const [subnetResult, setSubnetResult] = useState(null);
+
+        // MAC Vendor Lookup state
+        const [macInput, setMacInput] = useState('00:1C:B3:AA:BB:CC');
+        const [vendorResult, setVendorResult] = useState(null);
+        const [ouiDb, setOuiDb] = useState(() => {
+            const saved = localStorage.getItem('ouiDB');
+            return saved ? JSON.parse(saved) : {
+                '00:1C:B3': 'Apple, Inc.',
+                'F0:79:59': 'Apple, Inc.',
+                '3C:5A:B4': 'Apple, Inc.',
+                '00:1E:E5': 'Cisco Systems',
+                '00:1C:BF': 'Cisco Systems',
+                '00:14:22': 'Dell Inc.',
+                '00:1E:C9': 'Dell Inc.',
+                '00:0C:29': 'VMware, Inc.',
+                '00:50:56': 'VMware, Inc.'
+            };
+        });
+        const [newOui, setNewOui] = useState({ prefix: '', vendor: '' });
+
+        // Helpers for subnet calculator
+        const parseIp = (ip) => {
+            const parts = ip.trim().split('.').map(n => Number(n));
+            if (parts.length !== 4 || parts.some(n => isNaN(n) || n < 0 || n > 255)) return null;
+            return parts;
+        };
+        const ipToInt = (parts) => ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+        const intToIp = (n) => [ (n >>> 24) & 0xFF, (n >>> 16) & 0xFF, (n >>> 8) & 0xFF, n & 0xFF ].join('.');
+        const cidrToMask = (cidr) => {
+            const c = Number(cidr);
+            if (isNaN(c) || c < 0 || c > 32) return null;
+            return (c === 0) ? 0 : ((0xFFFFFFFF << (32 - c)) >>> 0);
+        };
+
+        const calculateSubnet = () => {
+            const ipParts = parseIp(ipInput);
+            const maskInt = cidrToMask(cidrInput);
+            if (!ipParts || maskInt === null) {
+                toast.error('Invalid IP or CIDR');
+                return;
+            }
+            const ipInt = ipToInt(ipParts);
+            const network = (ipInt & maskInt) >>> 0;
+            const broadcast = (network | (~maskInt >>> 0)) >>> 0;
+            const cidr = Number(cidrInput);
+            const special31 = cidr === 31;
+            const special32 = cidr === 32;
+            const firstUsable = special32 ? network : (special31 ? network : (network + 1) >>> 0);
+            const lastUsable = special32 ? network : (special31 ? broadcast : (broadcast - 1) >>> 0);
+            const hosts = special32 ? 1 : (special31 ? 2 : Math.max(0, (2 ** (32 - cidr)) - 2));
+
+            setSubnetResult({
+                network: intToIp(network),
+                broadcast: intToIp(broadcast),
+                netmask: intToIp(maskInt),
+                firstUsable: special32 ? 'N/A' : intToIp(firstUsable),
+                lastUsable: special32 ? 'N/A' : intToIp(lastUsable),
+                hosts,
+                cidr
+            });
+            toast.success('Subnet calculated');
+        };
+
+        // Helpers for MAC vendor lookup
+        const normalizeMac = (mac) => mac.toUpperCase().replace(/[^0-9A-F]/g, '').slice(0, 12);
+        const lookupVendor = () => {
+            const clean = normalizeMac(macInput);
+            if (clean.length < 6) {
+                toast.error('Enter at least first 6 hex digits');
+                return;
+            }
+            const oui = `${clean.slice(0,2)}:${clean.slice(2,4)}:${clean.slice(4,6)}`;
+            const vendor = ouiDb[oui] || 'Unknown vendor';
+            setVendorResult({ oui, vendor });
+            toast.success('Lookup complete');
+        };
+        const addOui = () => {
+            const prefix = newOui.prefix.toUpperCase().replace(/[^0-9A-F]/g, '').slice(0,6);
+            const formatted = `${prefix.slice(0,2)}:${prefix.slice(2,4)}:${prefix.slice(4,6)}`;
+            if (prefix.length !== 6 || !newOui.vendor.trim()) {
+                toast.error('Provide a 6-hex OUI and vendor name');
+                return;
+            }
+            const updated = { ...ouiDb, [formatted]: newOui.vendor.trim() };
+            setOuiDb(updated);
+            try { localStorage.setItem('ouiDB', JSON.stringify(updated)); } catch {}
+            setNewOui({ prefix: '', vendor: '' });
+            toast.success('OUI added');
+        };
+
+        return (
+            <div className="space-y-6">
+                <GlassPanel className="p-6">
+                    <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Subnet Calculator</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">IP Address</label>
+                            <input value={ipInput} onChange={e => setIpInput(e.target.value)} placeholder="192.168.1.10" className="w-full p-2 bg-white dark:bg-black/30 border border-cyan-500/20 rounded-lg" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">CIDR</label>
+                            <input value={cidrInput} onChange={e => setCidrInput(e.target.value)} placeholder="24" className="w-full p-2 bg-white dark:bg-black/30 border border-cyan-500/20 rounded-lg" />
+                        </div>
+                        <div className="md:col-span-2">
+                            <button onClick={calculateSubnet} className="w-full md:w-auto px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold hover:opacity-90">Calculate</button>
+                        </div>
+                    </div>
+                    {subnetResult && (
+                        <div className="mt-4 overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <tbody>
+                                    <tr><td className="p-2 font-semibold">Network</td><td className="p-2">{subnetResult.network}/{subnetResult.cidr}</td></tr>
+                                    <tr><td className="p-2 font-semibold">Broadcast</td><td className="p-2">{subnetResult.broadcast}</td></tr>
+                                    <tr><td className="p-2 font-semibold">Netmask</td><td className="p-2">{subnetResult.netmask}</td></tr>
+                                    <tr><td className="p-2 font-semibold">Usable Range</td><td className="p-2">{subnetResult.firstUsable} - {subnetResult.lastUsable}</td></tr>
+                                    <tr><td className="p-2 font-semibold">Hosts</td><td className="p-2">{subnetResult.hosts}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </GlassPanel>
+
+                <GlassPanel className="p-6">
+                    <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">MAC Address Vendor Lookup</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">MAC Address</label>
+                            <input value={macInput} onChange={e => setMacInput(e.target.value)} placeholder="00:1C:B3:AA:BB:CC" className="w-full p-2 bg-white dark:bg-black/30 border border-cyan-500/20 rounded-lg" />
+                        </div>
+                        <div>
+                            <button onClick={lookupVendor} className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold hover:opacity-90">Lookup</button>
+                        </div>
+                    </div>
+                    {vendorResult && (
+                        <div className="mt-4">
+                            <div className="p-3 rounded bg-cyan-500/5 border border-cyan-500/20">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">OUI</div>
+                                <div className="font-mono text-cyan-700 dark:text-cyan-300">{vendorResult.oui}</div>
+                                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">Vendor</div>
+                                <div className="font-semibold">{vendorResult.vendor}</div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="mt-6">
+                        <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">Add/Override OUI Mapping</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                            <input value={newOui.prefix} onChange={e => setNewOui(p => ({...p, prefix: e.target.value}))} placeholder="OUI prefix (e.g., 001CB3)" className="p-2 bg-white dark:bg-black/30 border border-cyan-500/20 rounded-lg" />
+                            <input value={newOui.vendor} onChange={e => setNewOui(p => ({...p, vendor: e.target.value}))} placeholder="Vendor name" className="p-2 bg-white dark:bg-black/30 border border-cyan-500/20 rounded-lg" />
+                            <button onClick={addOui} className="px-4 py-2 rounded-lg bg-green-500 text-white font-bold hover:opacity-90">Save Mapping</button>
+                        </div>
+                    </div>
+                </GlassPanel>
+            </div>
+        );
+    };
+
 const AclRuleForm = ({ onSave, onCancel, initialData }) => {
     const isEditing = !!initialData;
     const [rule, setRule] = useState(
@@ -3125,7 +3289,7 @@ const ConfigBackupModal = ({ onClose, devices }) => {
 
     const handleRestore = (config) => {
         if (confirm(`Restore configuration from ${new Date(config.timestamp).toLocaleString()} for ${config.device}?`)) {
-            alert(`Configuration restored successfully for ${config.device}`);
+            toast.success(`Configuration restored for ${config.device}`);
         }
     };
 
@@ -3490,7 +3654,7 @@ const MaintenanceModeModal = ({ onClose, devices }) => {
 
     const addMaintenanceWindow = () => {
         if (!newWindow.device || !newWindow.startTime || !newWindow.endTime || !newWindow.reason) {
-            alert('Please fill in all fields');
+            toast.error('Please fill in all fields');
             return;
         }
         const window = {
@@ -5370,8 +5534,8 @@ function App() {
         { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' }, { id: 'switches', icon: 'switch', label: 'Switches' },
         { id: 'routers', icon: 'router', label: 'Routers' }, { id: 'servers', icon: 'server', label: 'Servers' },
         { id: 'wireless', icon: 'wifi', label: 'Wireless' }, { id: 'dns', icon: 'dns', label: 'DNS' },
-        { id: 'acl', icon: 'shield', label: 'ACL' }, { id: 'health', icon: 'activity', label: 'Network Health' },
-        { id: 'settings', icon: 'settings', label: 'Settings' },
+          { id: 'acl', icon: 'shield', label: 'ACL' }, { id: 'health', icon: 'activity', label: 'Network Health' },
+          { id: 'tools', icon: 'network', label: 'Tools' }, { id: 'settings', icon: 'settings', label: 'Settings' },
     ], []);
     
     useEffect(() => {
@@ -5739,6 +5903,7 @@ function App() {
             case 'dns': return <DnsView records={dnsRecords} onAddRecord={handleAddDnsRecord} onDeleteRecord={handleDeleteDnsRecord} userRole={userRole}/>;
             case 'acl': return <AclView rules={aclRules} onAddRule={handleAddAclRule} onEditRule={handleEditAclRule} onDeleteRule={handleDeleteAclRule} onToggleRule={handleToggleAclRule} onReorderRule={handleMoveAclRule} userRole={userRole}/>;
             case 'health': return <NetworkHealthView yearlyBandwidthData={yearlyBandwidth} onStartSpeedTest={() => setShowSpeedTestModal(true)} loading={dataLoading} />;
+            case 'tools': return <ToolsView />;
             // ✅ We now pass the new theme handler to SettingsView
             case 'settings': 
                 return <SettingsView 
@@ -5759,8 +5924,9 @@ function App() {
 
     return (
         <ErrorBoundary>
+            <Toaster position="top-right" richColors expand />
             {/* ✅ Container styles; dark mode driven by root `.dark` class */}
-            <div className={"min-h-screen text-gray-800 dark:text-gray-200 font-sans bg-gray-100 dark:bg-[#020c1a]"}>
+            <div className={"min-h-screen text-gray-800 dark:text-gray-200 font-sans bg-[#f6f9fc] dark:bg-[#020c1a]"}>
                 <style>{`
                     .no-scrollbar::-webkit-scrollbar { display: none; }
                     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
